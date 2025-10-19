@@ -97,7 +97,7 @@ All configuration is managed through the `.env` file in the project root. Here's
 #### Server Configuration
 
 ```env
-PORT=3000                      # Server port
+PORT=3001                      # Server port
 NODE_ENV=development           # Environment (development/production)
 LOG_LEVEL=info                 # Logging level
 ```
@@ -171,7 +171,7 @@ Tables are **automatically created** on first run:
 npm run dev
 ```
 
-Server runs on `http://localhost:3000` with auto-restart on file changes.
+Server runs on `http://localhost:3001` with auto-restart on file changes.
 
 ### Production Mode
 
@@ -191,7 +191,7 @@ Checks that all required environment variables and dependencies are configured.
 
 ```bash
 # Verify your webhook is working
-curl "http://localhost:3000/webhook?hub.mode=subscribe&hub.verify_token=drugsng_webhook_verify_secure_2024&hub.challenge=test_challenge"
+curl "http://localhost:3001/webhook?hub.mode=subscribe&hub.verify_token=drugsng_webhook_verify_secure_2024&hub.challenge=test_challenge"
 ```
 
 ---
@@ -229,11 +229,12 @@ Add these 5 variables:
 | `ENCRYPTION_KEY`           | Your encryption key                  |
 
 ```env
-DATABASE_URL=DATABASE_URL=postgresql://neondb_owner:npg_VMeLcUdxjY48@ep-nameless-haze-abhb96qk-pooler.eu-west-2.aws.neon.tech/drugsng_db?sslmode=require&channel_binding=require
+DATABASE_URL=postgresql://neondb_owner:npg_VMeLcUdxjY48@ep-nameless-haze-abhb96qk-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 WHATSAPP_ACCESS_TOKEN=EAApc68DK3D8BPmlO7rJZA3dGuueHwUbnEpslfCUJcQU42CZCu202j8YVsBRiAhximOHxJRsCZCOftABZAx7epuHUVZCpFiVgxDMeSDCGO5NG1x1q75gCzRfQ9sTq6SZASRZBqHoMwbjIF8I8n0Pbg0l3f4ySkXZBlADaxLDZCXseB2bxLpzyZBpwRUrXaHJBP2sKVYBu4QHOw2fLsj0yXls3575ASGOrkffdxN34c4Bb2fQT0jlQZDZD
 WHATSAPP_PHONE_NUMBER_ID=734619229742461
 WHATSAPP_VERIFY_TOKEN=drugsng_webhook_verify_secure_2024
 ENCRYPTION_KEY=a7f4b9e2c1d8f5a3b6e9d2c5f8a1b4e7d0c3f6a9b2e5c8d1f4a7b0e3c6f9a2
+PORT=3001
 NODE_ENV=production
 ```
 
@@ -280,12 +281,12 @@ Send a message from phone `+1 555 175 1458` to your WhatsApp Business number. Bo
 
 ### Database Connection Failed
 
-**Error**: "database "drugsng db" does not exist"
+**Error**: "database does not exist"
 
 ```
 Solution:
-- Neon auto-creates databases on first query
-- Ensure DATABASE_URL is correct in .env
+- Use "neondb" as the default database name in your connection string
+- Ensure DATABASE_URL is correct in .env (no duplicate "DATABASE_URL=" prefix)
 - Check Neon dashboard for active connection
 ```
 
