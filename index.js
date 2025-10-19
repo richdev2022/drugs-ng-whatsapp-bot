@@ -45,26 +45,52 @@ async function startServer() {
     // Start server first
     app.listen(PORT, () => {
       console.log(`Drugs.ng WhatsApp Bot server running on port ${PORT}`);
-      console.log(`Webhook endpoint: https://your-domain.com/webhook`);
+      const webhookUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://drugs-ng-whatsapp-bot.vercel.app/webhook'
+        : `http://localhost:${PORT}/webhook`;
+      console.log(`Webhook endpoint: ${webhookUrl}`);
     });
 
-    // Try to connect to database in the background
-    try {
-      await sequelize.authenticate();
-      console.log('PostgreSQL connection established successfully.');
-
-      // Initialize database
-      await initializeDatabase();
-      console.log('Database initialized successfully.');
-    } catch (dbError) {
-      console.warn('Database connection failed - starting server in limited mode:', dbError.message);
-      console.warn('Please configure database credentials to enable full functionality.');
+    // Try to connect to database in the background with retries
+    let retries = 5;
+    let connected = false;
+    
+    while (retries > 0 && !connected) {
+      try {
+        await sequelize.authenticate();
+        console.log('PostgreSQL connection established successfully.');
+        connected = true;
+        
+        // Initialize database
+        await initializeDatabase();
+        console.log('Database initialized successfully.');
+      } catch (dbError) {
+        retries--;
+        if (retries === 0) {
+          console.warn('Database connection failed after multiple attempts - starting server in limited mode:', dbError.message);
+          console.warn('Please configure database credentials to enable full functionality.');
+        } else {
+          console.log(`Database connection attempt failed. Retrying... (${retries} attempts left)`);
+          // Wait for 2 seconds before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
     }
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
+
+// Root endpoint for status check
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Drugs.ng WhatsApp Bot API is running',
+    version: '1.0.0',
+    databaseConnected: sequelize.authenticate().then(() => true).catch(() => false)
+  });
+});
 
 // WhatsApp webhook verification
 app.get('/webhook', (req, res) => {

@@ -5,18 +5,29 @@ require('dotenv').config();
 let sequelize;
 
 if (process.env.DATABASE_URL) {
-  // Use Neon connection string
+  // Use Neon connection string with optimized settings for serverless
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
-      max: 10,
+      max: 5,
       min: 0,
-      acquire: 30000,
+      acquire: 60000,
       idle: 10000
     },
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      },
+      keepAlive: true,
+      connectTimeout: 60000 // 60 seconds
+    },
     ssl: true,
-    native: false
+    native: false,
+    retry: {
+      max: 3
+    }
   });
 } else {
   // Fall back to individual DB variables
