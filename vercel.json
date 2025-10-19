@@ -1,0 +1,27 @@
+{
+  "buildCommand": "npm install",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nodejs",
+  "nodeVersion": "18.x",
+  "env": {
+    "PORT": {
+      "value": "3000"
+    },
+    "NODE_ENV": {
+      "value": "production"
+    },
+    "LOG_LEVEL": {
+      "value": "info"
+    }
+  },
+  "envFile": ".env.production",
+  "functions": {
+    "index.js": {
+      "maxDuration": 30
+    }
+  },
+  "buildScript": "npm install",
+  "outputDirectory": ".",
+  "publicSource": false
+}
