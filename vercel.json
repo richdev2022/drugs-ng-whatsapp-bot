@@ -19,6 +19,5 @@
       "maxDuration": 30
     }
   },
-  "outputDirectory": ".",
-  "publicSource": false
+  "outputDirectory": "."
 }
