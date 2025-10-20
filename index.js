@@ -820,7 +820,8 @@ const handleLogin = async (phoneNumber, session, parameters) => {
         // Validate credentials
         const validation = isValidLoginData(credentials);
         if (!validation.valid) {
-          await sendWhatsAppMessage(phoneNumber, `❌ Login failed: ${validation.error}`);
+          const errorMsg = formatResponseWithOptions(`❌ Login failed: ${validation.error}`, false);
+          await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
 
@@ -833,11 +834,13 @@ const handleLogin = async (phoneNumber, session, parameters) => {
         session.data.token = result.token;
         await session.save();
 
-        await sendWhatsAppMessage(phoneNumber, `✅ Login successful! Welcome back to Drugs.ng. Type 'help' to see what you can do.`);
+        const successMsg = formatResponseWithOptions(`✅ Login successful! Welcome back to Drugs.ng. Type 'help' to see what you can do.`, true);
+        await sendWhatsAppMessage(phoneNumber, successMsg);
       } catch (error) {
         console.error('Login error:', error);
         const errorMessage = handleApiError(error, 'login').message;
-        await sendWhatsAppMessage(phoneNumber, `❌ Login failed: ${errorMessage}`);
+        const errorMsg = formatResponseWithOptions(`❌ Login failed: ${errorMessage}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
       }
     } else {
       // Request missing parameters
@@ -846,10 +849,12 @@ const handleLogin = async (phoneNumber, session, parameters) => {
       if (!parameters.email) message += "• Email address\n";
       if (!parameters.password) message += "• Password\n";
 
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, false);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
     }
   } else {
-    await sendWhatsAppMessage(phoneNumber, "You're already logged in. Type 'help' to see available services.");
+    const msg = formatResponseWithOptions("You're already logged in. Type 'help' to see available services.", true);
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
