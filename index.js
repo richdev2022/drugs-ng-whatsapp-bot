@@ -1141,49 +1141,78 @@ const handleGreeting = async (phoneNumber, session) => {
 // Handle registration
 const handleRegistration = async (phoneNumber, session, parameters) => {
   if (session.state === 'NEW' || session.state === 'REGISTERING') {
-    session.state = 'REGISTERING';
-    await session.save();
-
-    // If we have all required parameters
+    // If we have all required parameters (name, email, password)
     if (parameters.name && parameters.email && parameters.password) {
-      try {
-        // Validate input
-        const userData = {
-          name: sanitizeInput(parameters.name),
-          email: sanitizeInput(parameters.email).toLowerCase(),
-          password: sanitizeInput(parameters.password),
-          phoneNumber: normalizePhoneNumber(phoneNumber)
-        };
+      const userData = {
+        name: sanitizeInput(parameters.name),
+        email: sanitizeInput(parameters.email).toLowerCase(),
+        password: sanitizeInput(parameters.password),
+        phoneNumber: normalizePhoneNumber(phoneNumber)
+      };
 
-        const validation = isValidRegistrationData(userData);
-        if (!validation.valid) {
-          const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+      // Validate input
+      const validation = isValidRegistrationData(userData);
+      if (!validation.valid) {
+        const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
+        return;
+      }
+
+      // Check if email already exists
+      try {
+        const existingUser = await sequelize.models.User.findOne({
+          where: { email: userData.email }
+        });
+
+        if (existingUser) {
+          const errorMsg = formatResponseWithOptions(`❌ This email is already registered. Type 'login' to sign in or use a different email.`, false);
           await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
+      } catch (error) {
+        console.error('Error checking existing user:', error);
+      }
 
-        // Register user in both PostgreSQL and Drugs.ng API
-        const result = await registerUser(userData);
+      // Store registration data in session
+      session.state = 'REGISTERING';
+      session.data.registrationData = userData;
+      await session.save();
 
-        // Update session
-        session.state = 'LOGGED_IN';
-        session.data.userId = result.userId;
-        session.data.token = result.token;
-        await session.save();
+      // Request OTP to be sent to email
+      try {
+        const { generateOTP, getOTPExpiry } = require('./utils/otp');
+        const { OTP } = require('./models');
 
-        // Notify support teams
-        await notifySupportTeams(phoneNumber, 'New User Registration', {
-          name: userData.name,
-          email: userData.email
+        // Generate and save OTP
+        const otp = generateOTP();
+        const expiresAt = getOTPExpiry();
+
+        await OTP.create({
+          email: userData.email,
+          code: otp,
+          purpose: 'registration',
+          expiresAt: expiresAt
         });
 
-        const successMsg = formatResponseWithOptions(`✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`, true);
-        await sendWhatsAppMessage(phoneNumber, successMsg);
+        // Send OTP email
+        const { sendOTPEmail } = require('./config/brevo');
+        await sendOTPEmail(userData.email, otp, userData.name);
+
+        const otpMsg = formatResponseWithOptions(`📧 OTP has been sent to ${userData.email}. Please reply with your 4-digit code to complete registration. The code is valid for 5 minutes.`, false);
+        await sendWhatsAppMessage(phoneNumber, otpMsg);
+
+        // Store that we're waiting for OTP verification
+        session.data.waitingForOTPVerification = true;
+        session.data.registrationAttempts = (session.data.registrationAttempts || 0) + 1;
+        await session.save();
+
       } catch (error) {
-        console.error('Registration error:', error);
-        const errorMessage = handleApiError(error, 'registration').message;
-        const errorMsg = formatResponseWithOptions(`❌ Registration failed: ${errorMessage}`, false);
+        console.error('Error sending OTP:', error);
+        const errorMsg = formatResponseWithOptions(`❌ Failed to send OTP. Please try again.`, false);
         await sendWhatsAppMessage(phoneNumber, errorMsg);
+        session.data.registrationData = null;
+        session.data.waitingForOTPVerification = false;
+        await session.save();
       }
     } else {
       // Request missing parameters
@@ -1244,7 +1273,7 @@ const handleLogin = async (phoneNumber, session, parameters) => {
       }
     } else {
       // Request missing parameters
-      let message = "🔐 To login, send your credentials in one message:\n";
+      let message = "���� To login, send your credentials in one message:\n";
       message += "Example: 'login john@example.com mypassword'\n\n";
       if (!parameters.email) message += "• Email address\n";
       if (!parameters.password) message += "• Password\n";
