@@ -901,7 +901,7 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
       const otpMatch = messageText.match(/^\d{4}$/);
       if (otpMatch) {
         console.log(`🔐 Processing OTP verification`);
-        await handleRegistrationOTPVerification(phoneNumber, session);
+        await handleRegistrationOTPVerification(phoneNumber, session, otpMatch[0]);
         return;
       }
     }
