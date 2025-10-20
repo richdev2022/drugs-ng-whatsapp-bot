@@ -1,6 +1,6 @@
 # Drugs.ng WhatsApp Bot 🤖💊
 
-A WhatsApp Business API integration bot for Drugs.ng healthcare services, built with Express.js, PostgreSQL (Neon), and NLP capabilities.
+A WhatsApp Business API integration bot for Drugs.ng healthcare services, built with Express.js, PostgreSQL (Neon), and custom NLP capabilities.
 
 ## 📋 Table of Contents
 
@@ -11,6 +11,7 @@ A WhatsApp Business API integration bot for Drugs.ng healthcare services, built 
 - [Configuration](#configuration)
 - [Running Locally](#running-locally)
 - [Deployment](#deployment)
+- [NLP System](#nlp-system)
 - [API Endpoints](#api-endpoints)
 - [Troubleshooting](#troubleshooting)
 - [Security](#security)
@@ -25,7 +26,8 @@ A WhatsApp Business API integration bot for Drugs.ng healthcare services, built 
 - **Order Management**: Place orders, track shipments, manage cart
 - **Doctor Appointments**: Book and manage medical appointments
 - **Payment Processing**: Integrate with Flutterwave & Paystack (optional)
-- **NLP Processing**: Keyword-based message understanding with Dialogflow fallback
+- **Advanced NLP**: Built-in custom NLP for intelligent message understanding
+- **Numeric Commands**: Quick access via numbers (1-6) for main features
 - **Customer Support**: Team chat system for support interactions
 - **Data Encryption**: AES-256 encryption for sensitive user data
 - **Rate Limiting**: Protect against abuse with rate limiting
@@ -39,7 +41,7 @@ A WhatsApp Business API integration bot for Drugs.ng healthcare services, built 
 - **Database**: PostgreSQL (Neon Cloud)
 - **ORM**: Sequelize
 - **API**: Meta WhatsApp Business API
-- **NLP**: Dialogflow with keyword-based fallback
+- **NLP**: Custom in-app natural language processing
 - **Payments**: Flutterwave v3, Paystack
 - **Security**: bcryptjs, crypto-js (AES-256)
 - **Deployment**: Vercel
@@ -75,10 +77,10 @@ npm run setup
 
 ### Step 2: Configure Environment Variables
 
-Copy your current `.env` file - it already contains all necessary credentials:
+Your `.env` file contains all necessary credentials:
 
 ```bash
-# File: .env
+# File: .env (REQUIRED VARIABLES)
 DATABASE_URL=<your-neon-connection-string>
 WHATSAPP_ACCESS_TOKEN=<your-whatsapp-token>
 WHATSAPP_PHONE_NUMBER_ID=<your-phone-id>
@@ -92,13 +94,13 @@ ENCRYPTION_KEY=<your-encryption-key>
 
 ### Environment Variables (`.env`)
 
-All configuration is managed through the `.env` file in the project root. Here's what each section does:
+All configuration is managed through the `.env` file in the project root.
 
 #### Server Configuration
 
 ```env
-PORT=3001                      # Server port
-NODE_ENV=development           # Environment (development/production)
+PORT=10000                     # Server port
+NODE_ENV=production            # Environment (development/production)
 LOG_LEVEL=info                 # Logging level
 ```
 
@@ -109,7 +111,6 @@ DATABASE_URL=postgresql://...  # Neon PostgreSQL connection string
 ```
 
 The connection string includes:
-
 - Host, port, database name
 - SSL and channel binding for security
 - Connection pooling for serverless
@@ -129,7 +130,6 @@ ENCRYPTION_KEY=...             # AES-256 encryption key (32+ characters)
 ```
 
 Used to encrypt:
-
 - User emails, phone numbers, passwords
 - Payment transaction data
 - Support chat messages
@@ -138,7 +138,6 @@ Used to encrypt:
 #### Optional Integrations
 
 ```env
-DIALOGFLOW_PROJECT_ID=...      # Google Cloud Dialogflow (NLP)
 FLUTTERWAVE_PUBLIC_KEY=...     # Flutterwave payment gateway
 FLUTTERWAVE_SECRET_KEY=...
 FLUTTERWAVE_SECRET_HASH=...
@@ -146,20 +145,20 @@ PAYSTACK_SECRET_KEY=...        # Paystack payment gateway
 PAYMENT_REDIRECT_URL=...       # Payment callback URL
 DRUGSNG_API_BASE_URL=...       # Drugs.ng API endpoint
 COMPANY_LOGO=...               # Logo URL for payments
-SUPPORT_PHONE_NUMBER_1-4=...   # Support team phone numbers
 ```
 
 ### Database Initialization
 
 Tables are **automatically created** on first run:
 
-- `Users` - Customer profiles
-- `Products` - Pharmaceutical products
-- `Orders` - Customer orders
+- `Users` - Customer profiles and authentication
+- `Products` - Pharmaceutical products catalog
+- `Orders` - Customer orders and transactions
 - `Carts` - Shopping carts
 - `Appointments` - Doctor appointments
 - `SupportChats` - Customer support conversations
 - `SupportTeams` - Support agent accounts
+- `Sessions` - User session management
 
 ---
 
@@ -171,7 +170,7 @@ Tables are **automatically created** on first run:
 npm run dev
 ```
 
-Server runs on `http://localhost:3001` with auto-restart on file changes.
+Server runs on `http://localhost:10000` with auto-restart on file changes.
 
 ### Production Mode
 
@@ -191,7 +190,7 @@ Checks that all required environment variables and dependencies are configured.
 
 ```bash
 # Verify your webhook is working
-curl "http://localhost:3001/webhook?hub.mode=subscribe&hub.verify_token=drugsng_webhook_verify_secure_2024&hub.challenge=test_challenge"
+curl "http://localhost:10000/webhook?hub.mode=subscribe&hub.verify_token=drugsng_webhook_verify_secure_2024&hub.challenge=test_challenge"
 ```
 
 ---
@@ -218,7 +217,7 @@ git push origin main
 
 In Vercel dashboard: **Settings → Environment Variables**
 
-Add these 5 variables:
+Add these 5 **required** variables:
 
 | Key                        | Value                                |
 | -------------------------- | ------------------------------------ |
@@ -227,16 +226,8 @@ Add these 5 variables:
 | `WHATSAPP_PHONE_NUMBER_ID` | `734619229742461`                    |
 | `WHATSAPP_VERIFY_TOKEN`    | `drugsng_webhook_verify_secure_2024` |
 | `ENCRYPTION_KEY`           | Your encryption key                  |
-
-```env
-DATABASE_URL=postgresql://neondb_owner:npg_VMeLcUdxjY48@ep-nameless-haze-abhb96qk-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-WHATSAPP_ACCESS_TOKEN=EAApc68DK3D8BPmlO7rJZA3dGuueHwUbnEpslfCUJcQU42CZCu202j8YVsBRiAhximOHxJRsCZCOftABZAx7epuHUVZCpFiVgxDMeSDCGO5NG1x1q75gCzRfQ9sTq6SZASRZBqHoMwbjIF8I8n0Pbg0l3f4ySkXZBlADaxLDZCXseB2bxLpzyZBpwRUrXaHJBP2sKVYBu4QHOw2fLsj0yXls3575ASGOrkffdxN34c4Bb2fQT0jlQZDZD
-WHATSAPP_PHONE_NUMBER_ID=734619229742461
-WHATSAPP_VERIFY_TOKEN=drugsng_webhook_verify_secure_2024
-ENCRYPTION_KEY=a7f4b9e2c1d8f5a3b6e9d2c5f8a1b4e7d0c3f6a9b2e5c8d1f4a7b0e3c6f9a2
-PORT=3001
-NODE_ENV=production
-```
+| `PORT`                     | `10000`                              |
+| `NODE_ENV`                 | `production`                         |
 
 ### Step 4: Deploy
 
@@ -255,7 +246,107 @@ After deployment, Vercel provides your domain (e.g., `drugsng-bot.vercel.app`):
 
 ### Step 6: Test Production
 
-Send a message from phone `+1 555 175 1458` to your WhatsApp Business number. Bot should respond!
+Send a message to your WhatsApp Business number. Bot should respond!
+
+---
+
+## 🧠 NLP System
+
+The bot uses a **custom in-app Natural Language Processing system** that requires no external API calls.
+
+### How It Works
+
+The NLP system intelligently detects user intent from natural language input using:
+
+- **Pattern Matching**: Regex-based keyword detection
+- **Parameter Extraction**: Automatically extracts data (emails, numbers, dates)
+- **Intent Routing**: Maps natural language to specific features
+- **Session Context**: Remembers user state across conversations
+
+### Supported Intents
+
+| Intent | Triggers | Example |
+| --- | --- | --- |
+| **Greeting** | hello, hi, hey, start | "Hello" |
+| **Register** | register, signup, new account | "register John john@email.com pass123" |
+| **Login** | login, signin | "login john@email.com pass123" |
+| **Logout** | logout, exit, bye | "logout" |
+| **Search Products** | find, search, medicine, product | "Find paracetamol" or type "1" |
+| **Add to Cart** | add, cart, basket | "add 1 2" (product 1, quantity 2) |
+| **Place Order** | order, checkout, buy | "order 123 Main St Flutterwave" or type "5" |
+| **Track Order** | track, status, where | "track 12345" or type "3" |
+| **Search Doctors** | find doctor, specialist | "Find a cardiologist in Lagos" or type "2" |
+| **Book Appointment** | book, schedule, appointment | "book 1 2024-06-15 14:00" or type "4" |
+| **Payment** | pay, payment | "pay 12345 flutterwave" |
+| **Help** | help, menu, features | "help" |
+| **Support** | support, agent, complaint | "I need support" or type "6" |
+
+### Numeric Command Routing (1-6)
+
+Users can type a single number to quickly access features:
+
+- **1** → Search Medicines 🔍
+- **2** → Find Doctors 👨‍⚕️
+- **3** → Track Orders 📍
+- **4** → Book Appointment 📅
+- **5** → Place Order 📦
+- **6** → Customer Support 🆘
+
+### Response Options
+
+Every bot response includes contextual options:
+
+- **If Not Logged In**: "Type 'help' for menu | 'login' to sign in | 'register' to create account"
+- **If Logged In**: "Type 'help' for menu | 'logout' to sign out"
+
+### Authentication Requirements
+
+Some features require login:
+- Add to cart
+- Place order
+- Track orders
+- Book appointments
+- Make payments
+
+Users attempting these while logged out see:
+```
+🔐 Authentication Required
+
+You need to be logged in to access this feature.
+Please login with your email and password:
+Example: login john@example.com mypassword
+
+Or register if you're new:
+Example: register John Doe john@example.com mypassword
+```
+
+### Parameter Extraction
+
+The NLP automatically extracts parameters from user messages:
+
+```
+User: "register John Doe john@example.com mypassword123"
+Extracts: { name: "John Doe", email: "john@example.com", password: "mypassword123" }
+
+User: "add 1 2"
+Extracts: { productIndex: "1", quantity: "2" }
+
+User: "order 123 Main St, Lagos Flutterwave"
+Extracts: { address: "123 Main St, Lagos", paymentMethod: "Flutterwave" }
+
+User: "book 1 2024-06-15 14:00"
+Extracts: { doctorIndex: "1", date: "2024-06-15", time: "14:00" }
+```
+
+### No External Dependencies
+
+Unlike Dialogflow:
+- ✅ No API keys required
+- ✅ No setup/configuration needed
+- ✅ Instant responses (no network latency)
+- ✅ Fully offline capable
+- ✅ No monthly costs
+- ✅ 100% privacy (data stays in your system)
 
 ---
 
@@ -274,6 +365,7 @@ Send a message from phone `+1 555 175 1458` to your WhatsApp Business number. Bo
 ### Root Endpoint
 
 - `GET /` - API status and information
+- `GET /health` - Health check endpoint
 
 ---
 
@@ -286,7 +378,7 @@ Send a message from phone `+1 555 175 1458` to your WhatsApp Business number. Bo
 ```
 Solution:
 - Use "neondb" as the default database name in your connection string
-- Ensure DATABASE_URL is correct in .env (no duplicate "DATABASE_URL=" prefix)
+- Ensure DATABASE_URL is correct in .env
 - Check Neon dashboard for active connection
 ```
 
@@ -299,6 +391,7 @@ Solution:
 1. Verify token must match WHATSAPP_VERIFY_TOKEN in .env
 2. Webhook URL must be HTTPS (Vercel provides this)
 3. Check Vercel logs: vercel.com → Project → Logs
+4. Ensure webhook is subscribed to "messages" event
 ```
 
 ### Encryption Key Issues
@@ -313,18 +406,6 @@ Solution:
 - Backup database before changing
 ```
 
-### Dialogflow Not Working
-
-**Error**: "Dialogflow service-account-key.json not found"
-
-```
-Solution:
-- Dialogflow is optional - uses fallback NLP
-- To enable: Download service account key from Google Cloud
-- Place as service-account-key.json in root
-- Or skip if keyword matching is sufficient
-```
-
 ### Payment Gateways Not Working
 
 **Error**: "Payment features disabled"
@@ -333,7 +414,19 @@ Solution:
 Solution:
 - Both Flutterwave and Paystack are optional
 - Configure in .env if needed: FLUTTERWAVE_PUBLIC_KEY, PAYSTACK_SECRET_KEY
-- Or use keyword-based responses without payment
+- Or use without payment processing
+```
+
+### NLP Not Understanding Commands
+
+**Error**: "Unknown intent" or wrong feature triggered
+
+```
+Solution:
+- NLP uses pattern matching - use clear keywords
+- Supported examples in NLP System section above
+- Numeric commands (1-6) are always reliable
+- Check session state (logged in vs logged out)
 ```
 
 ---
@@ -346,6 +439,7 @@ Solution:
 - Passwords hashed with bcrypt (10 rounds)
 - WhatsApp webhook verified with token challenge
 - Payment webhooks verified with HMAC signatures
+- Session data stored securely in PostgreSQL
 
 ### Environment Variables
 
@@ -360,6 +454,7 @@ Solution:
 - Input validation on all endpoints
 - Proper error handling (no sensitive data in logs)
 - HTTPS required for webhooks
+- Session-based state management
 
 ### Encryption Key Rotation
 
@@ -373,28 +468,6 @@ Solution:
 
 ---
 
-## 📞 Support Integration
-
-The bot includes customer support features:
-
-- Customers can escalate to support team via WhatsApp
-- Support team has dedicated phone numbers (configurable in .env)
-- Chat history stored and encrypted in database
-- Support team notified of customer issues
-
-### Configure Support Team
-
-Update these in `.env`:
-
-```env
-SUPPORT_PHONE_NUMBER_1=2348012345678
-SUPPORT_PHONE_NUMBER_2=2348023456789
-SUPPORT_PHONE_NUMBER_3=2348034567890
-SUPPORT_PHONE_NUMBER_4=2348045678901
-```
-
----
-
 ## 📊 Database Schema
 
 ### Users Table
@@ -403,6 +476,14 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 - name, email (unique), phone (unique)
 - password (hashed), isActive
 - drugsngUserId, drugsngToken
+
+### Sessions Table
+
+- id (primary key)
+- phoneNumber (unique)
+- state (NEW, REGISTERING, LOGGED_IN, SUPPORT_CHAT, etc.)
+- data (JSON - stores search results, cart, user ID)
+- lastActivity timestamp
 
 ### Orders Table
 
@@ -420,7 +501,7 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 ### SupportChats Table
 
 - id (primary key)
-- userId, supportTeamId (foreign keys)
+- customerPhoneNumber, supportTeamId (foreign key)
 - messages (encrypted), status
 
 ---
@@ -433,6 +514,13 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 - Idle timeout: 10 seconds
 - Acquire timeout: 30 seconds
 - Optimized for serverless (Vercel)
+
+### NLP Performance
+
+- Pattern matching (regex) - O(n) complexity
+- No network calls required
+- Instant intent detection
+- Parameter extraction in milliseconds
 
 ### Rate Limiting
 
@@ -448,11 +536,10 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 
 ---
 
-## 📚 File Structure
+## 📁 File Structure
 
 ```
 ├── .env                          # Environment variables (all credentials)
-├── .env.example                  # (DEPRECATED - use .env)
 ├── index.js                      # Main application file
 ├── package.json                  # Dependencies
 ├── setup.js                      # Setup verification script
@@ -460,7 +547,6 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 ├── config/
 │   ├── database.js              # Database connection (Sequelize)
 │   ├── env.js                   # Environment validation
-│   ├── dialogflow.js            # Dialogflow NLP client
 │   ├── whatsapp.js              # WhatsApp API client
 │   └── support.js               # Support team configuration
 │
@@ -469,7 +555,7 @@ SUPPORT_PHONE_NUMBER_4=2348045678901
 │
 ├── services/
 │   ├── drugsng.js               # Drugs.ng API integration
-│   ├── nlp.js                   # Natural language processing
+│   ├── nlp.js                   # Custom NLP system
 │   ├── payment.js               # Flutterwave & Paystack
 │   ├── security.js              # Encryption/decryption
 │   └── support.js               # Support chat features
@@ -537,5 +623,6 @@ For issues or questions:
 
 ---
 
-**Last Updated**: October 2024  
-**Status**: Production Ready ✅
+**Last Updated**: December 2024  
+**Status**: Production Ready ✅  
+**NLP System**: Custom In-App (No External Dependencies)
