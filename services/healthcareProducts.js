@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { HealthcareProduct, Cart, User, Product } = require('../models');
+const { uploadImage, deleteImage } = require('./cloudinary');
 
 // Drugs.ng API client with timeout
 const drugsngAPI = axios.create({
@@ -289,6 +290,85 @@ const clearCart = async (userId) => {
   }
 };
 
+// Upload healthcare product image
+const uploadProductImage = async (fileBuffer, productId = null, filename = null) => {
+  try {
+    if (!fileBuffer) {
+      throw new Error('File buffer is required');
+    }
+
+    // Upload to Cloudinary
+    const uploadedFile = await uploadImage(fileBuffer, {
+      folder: 'drugs-ng/products/healthcare',
+      filename: filename || `healthcare-product-${productId || Date.now()}`
+    });
+
+    return {
+      success: true,
+      url: uploadedFile.url,
+      publicId: uploadedFile.publicId,
+      message: 'Product image uploaded successfully'
+    };
+  } catch (error) {
+    console.error('Error uploading product image:', error);
+    throw error;
+  }
+};
+
+// Update product image
+const updateProductImage = async (productId, fileBuffer, filename = null) => {
+  try {
+    if (!productId || !fileBuffer) {
+      throw new Error('Product ID and file buffer are required');
+    }
+
+    // Get existing product
+    const product = await HealthcareProduct.findByPk(productId);
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    // Upload new image
+    const uploadResult = await uploadProductImage(fileBuffer, productId, filename);
+
+    // Update product with new image URL
+    product.imageUrl = uploadResult.url;
+    await product.save();
+
+    return {
+      success: true,
+      message: 'Product image updated successfully',
+      productId: product.id,
+      imageUrl: product.imageUrl
+    };
+  } catch (error) {
+    console.error('Error updating product image:', error);
+    throw error;
+  }
+};
+
+// Get product image URL
+const getProductImageUrl = async (productId) => {
+  try {
+    const product = await HealthcareProduct.findByPk(productId, {
+      attributes: ['id', 'name', 'imageUrl']
+    });
+
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    return {
+      productId: product.id,
+      productName: product.name,
+      imageUrl: product.imageUrl || null
+    };
+  } catch (error) {
+    console.error('Error getting product image URL:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   searchHealthcareProducts,
   getHealthcareProductsByCategory,
@@ -298,5 +378,8 @@ module.exports = {
   getUserCart,
   removeFromCart,
   updateCartItemQuantity,
-  clearCart
+  clearCart,
+  uploadProductImage,
+  updateProductImage,
+  getProductImageUrl
 };
