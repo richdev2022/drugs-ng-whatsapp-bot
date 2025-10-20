@@ -1004,6 +1004,24 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
         await handleSupportRequest(phoneNumber, session, parameters);
         break;
 
+      case 'diagnostic_tests':
+        console.log(`🔬 Handling diagnostic tests search`);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleDiagnosticTestSearch(phoneNumber, session, parameters);
+        }
+        break;
+
+      case 'healthcare_products':
+        console.log(`🛒 Handling healthcare products browse`);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleHealthcareProductBrowse(phoneNumber, session, parameters);
+        }
+        break;
+
       default:
         console.log(`❓ Unknown intent, sending fallback response`);
         const responseWithOptions = formatResponseWithOptions(fulfillmentText || "I'm not sure how to help with that. Type 'help' for menu.", isLoggedIn);
