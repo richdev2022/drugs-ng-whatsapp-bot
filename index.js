@@ -119,6 +119,11 @@ app.post('/webhook', async (req, res) => {
       for (const entry of data.entry) {
         for (const change of entry.changes) {
           if (change.field === 'messages') {
+            // Check if messages array exists before accessing
+            if (!change.value.messages || change.value.messages.length === 0) {
+              continue;
+            }
+
             const message = change.value.messages[0];
 
             if (message.type === 'text') {
