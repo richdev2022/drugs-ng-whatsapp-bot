@@ -104,6 +104,38 @@ const fallbackNLP = (message) => {
     if (/^(register|signup|sign up|create account|new account)/.test(lowerMessage)) {
       const emailMatch = message.match(/[\w.-]+@[\w.-]+\.\w+/);
       if (emailMatch) parameters.email = emailMatch[0];
+
+      // Parse registration data: "register John Doe john@example.com mypassword"
+      const registerMatch = message.match(/^(register|signup|sign up|create account|new account)\s+(.+?)(?:\s+[\w.-]+@[\w.-]+\.\w+)?(?:\s+\S+)?$/i);
+      if (registerMatch) {
+        const afterRegister = message.replace(/^(register|signup|sign up|create account|new account)\s+/i, '').trim();
+        const parts = afterRegister.split(/\s+/);
+
+        // Find email position
+        let emailIndex = -1;
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i].includes('@')) {
+            emailIndex = i;
+            break;
+          }
+        }
+
+        // Extract name (everything before email)
+        if (emailIndex > 0) {
+          parameters.name = parts.slice(0, emailIndex).join(' ');
+        }
+
+        // Extract email
+        if (emailIndex !== -1) {
+          parameters.email = parts[emailIndex];
+        }
+
+        // Extract password (everything after email)
+        if (emailIndex !== -1 && emailIndex + 1 < parts.length) {
+          parameters.password = parts.slice(emailIndex + 1).join(' ');
+        }
+      }
+
       return {
         intent: 'register',
         parameters,
