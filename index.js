@@ -38,6 +38,12 @@ const {
   getProductImageUrl
 } = require('./services/healthcareProducts');
 const { uploadAndSavePrescription } = require('./services/prescription');
+const {
+  uploadDoctorImage,
+  updateDoctorImage,
+  getDoctorImageUrl,
+  getDoctorsWithImages
+} = require('./services/doctorImages');
 
 const app = express();
 const PORT = ENV.PORT || 3000;
