@@ -703,6 +703,18 @@ Cart.belongsTo(User, { foreignKey: 'userId' });
 Product.hasMany(Cart, { foreignKey: 'productId' });
 Cart.belongsTo(Product, { foreignKey: 'productId' });
 
+User.hasMany(DiagnosticBooking, { foreignKey: 'userId' });
+DiagnosticBooking.belongsTo(User, { foreignKey: 'userId' });
+
+DiagnosticTest.hasMany(DiagnosticBooking, { foreignKey: 'diagnosticTestId' });
+DiagnosticBooking.belongsTo(DiagnosticTest, { foreignKey: 'diagnosticTestId' });
+
+Order.hasMany(Prescription, { foreignKey: 'orderId' });
+Prescription.belongsTo(Order, { foreignKey: 'orderId' });
+
+SupportTeam.hasMany(SupportRating, { foreignKey: 'supportTeamId' });
+SupportRating.belongsTo(SupportTeam, { foreignKey: 'supportTeamId' });
+
 // Initialize database with proper error handling
 const initializeDatabase = async () => {
   try {
