@@ -112,7 +112,7 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
   try {
     const data = req.body;
-    
+
     // Check if this is a WhatsApp message
     if (data.object === 'whatsapp_business_account') {
       // Process each entry
@@ -120,32 +120,50 @@ app.post('/webhook', async (req, res) => {
         for (const change of entry.changes) {
           if (change.field === 'messages') {
             const message = change.value.messages[0];
-            
+
             if (message.type === 'text') {
               const phoneNumber = message.from;
               const messageText = message.text.body;
               const messageId = message.id;
-              
+
+              console.log(`📨 Received message from ${phoneNumber}: "${messageText}"`);
+
               // Mark message as read
-              await markMessageAsRead(messageId);
-              
+              try {
+                await markMessageAsRead(messageId);
+              } catch (readError) {
+                console.warn('Failed to mark message as read:', readError.message);
+              }
+
               // Check if this is a support team message
               const supportTeam = await sequelize.models.SupportTeam.findOne({
                 where: { phoneNumber }
               });
-              
-              if (supportTeam) {
-                // This is a message from support team
-                await handleSupportTeamMessage(phoneNumber, messageText);
-              } else {
-                // This is a message from customer
-                await handleCustomerMessage(phoneNumber, messageText);
+
+              try {
+                if (supportTeam) {
+                  // This is a message from support team
+                  console.log(`👨‍💼 Support team message from ${phoneNumber}`);
+                  await handleSupportTeamMessage(phoneNumber, messageText);
+                } else {
+                  // This is a message from customer
+                  console.log(`👤 Customer message from ${phoneNumber}`);
+                  await handleCustomerMessage(phoneNumber, messageText);
+                }
+              } catch (handleError) {
+                console.error(`❌ Error handling message from ${phoneNumber}:`, handleError.message);
+                // Try to send error message to user
+                try {
+                  await sendWhatsAppMessage(phoneNumber, 'Sorry, I encountered an error processing your message. Please try again.');
+                } catch (errorReplyError) {
+                  console.error('Failed to send error reply:', errorReplyError.message);
+                }
               }
             }
           }
         }
       }
-      
+
       res.sendStatus(200);
     } else {
       res.sendStatus(404);
@@ -435,97 +453,124 @@ app.get('/health', (req, res) => {
 // Handle customer message
 const handleCustomerMessage = async (phoneNumber, messageText) => {
   try {
+    console.log(`\n🔄 [${phoneNumber}] Processing customer message: "${messageText}"`);
+
     // Check rate limit
     const rateLimitResult = await checkRateLimit(phoneNumber);
     if (!rateLimitResult.allowed) {
+      console.log(`⚠️  Rate limit exceeded for ${phoneNumber}`);
       await sendWhatsAppMessage(phoneNumber, rateLimitResult.message);
       return;
     }
-    
+
     // Get or create user session
     let session = await sequelize.models.Session.findOne({
       where: { phoneNumber }
     });
-    
+
     if (!session) {
+      console.log(`📝 Creating new session for ${phoneNumber}`);
       session = await sequelize.models.Session.create({
         phoneNumber,
         state: 'NEW',
         data: {}
       });
+    } else {
+      console.log(`📝 Found existing session for ${phoneNumber}, state: ${session.state}`);
     }
-    
+
     // Update last activity
     session.lastActivity = new Date();
     await session.save();
-    
+
     // Check if in support chat
     if (session.state === 'SUPPORT_CHAT') {
+      console.log(`💬 ${phoneNumber} is in support chat, forwarding message`);
       // Forward message to support team
       await sendSupportMessage(phoneNumber, messageText, true);
       return;
     }
-    
+
     // Process with NLP
+    console.log(`🤖 Processing with NLP...`);
     const nlpResult = await processMessage(messageText, phoneNumber);
     const { intent, parameters, fulfillmentText } = nlpResult;
+    console.log(`✨ NLP Result: intent="${intent}", source="${nlpResult.source}", confidence=${nlpResult.confidence}`);
     
     // Handle different intents
+    console.log(`🎯 Handling intent: ${intent}`);
     switch (intent) {
       case 'greeting':
         await handleGreeting(phoneNumber, session);
         break;
-        
+
       case 'register':
+        console.log(`📝 Handling registration`);
         await handleRegistration(phoneNumber, session, parameters);
         break;
-        
+
       case 'login':
+        console.log(`🔐 Handling login`);
         await handleLogin(phoneNumber, session, parameters);
         break;
-        
+
       case 'search_products':
+        console.log(`🔍 Handling product search`);
         await handleProductSearch(phoneNumber, session, parameters);
         break;
-        
+
       case 'add_to_cart':
+        console.log(`🛒 Handling add to cart`);
         await handleAddToCart(phoneNumber, session, parameters);
         break;
-        
+
       case 'place_order':
+        console.log(`📦 Handling place order`);
         await handlePlaceOrder(phoneNumber, session, parameters);
         break;
-        
+
       case 'track_order':
+        console.log(`📍 Handling track order`);
         await handleTrackOrder(phoneNumber, session, parameters);
         break;
-        
+
       case 'search_doctors':
+        console.log(`👨‍⚕️ Handling doctor search`);
         await handleDoctorSearch(phoneNumber, session, parameters);
         break;
-        
+
       case 'book_appointment':
+        console.log(`📅 Handling book appointment`);
         await handleBookAppointment(phoneNumber, session, parameters);
         break;
-        
+
       case 'payment':
+        console.log(`💳 Handling payment`);
         await handlePayment(phoneNumber, session, parameters);
         break;
-        
+
       case 'help':
+        console.log(`ℹ️  Sending help message`);
         await handleHelp(phoneNumber);
         break;
-        
+
       case 'support':
+        console.log(`🆘 Handling support request`);
         await handleSupportRequest(phoneNumber, session, parameters);
         break;
-        
+
       default:
+        console.log(`❓ Unknown intent, sending fallback response`);
         await sendWhatsAppMessage(phoneNumber, fulfillmentText || "I'm not sure how to help with that. Type 'help' for assistance.");
     }
+    console.log(`✅ Successfully processed message from ${phoneNumber}\n`);
   } catch (error) {
-    console.error('Error processing customer message:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, something went wrong. Please try again later.");
+    console.error(`❌ Error processing customer message from ${phoneNumber}:`, error.message);
+    try {
+      await sendWhatsAppMessage(phoneNumber, "Sorry, something went wrong. Please try again later.");
+    } catch (sendError) {
+      console.error(`❌ Failed to send error message to ${phoneNumber}:`, sendError.message);
+    }
   }
 };
 
@@ -623,10 +668,15 @@ const handleSupportCommand = async (supportTeam, commandText) => {
 
 // Handle greeting
 const handleGreeting = async (phoneNumber, session) => {
+  console.log(`👋 Handling greeting for ${phoneNumber}, session state: ${session.state}`);
   if (session.state === 'NEW') {
-    await sendWhatsAppMessage(phoneNumber, "Welcome to Drugs.ng! Your health companion in Africa. Are you a new user? Reply 'register' to sign up or 'login' if you already have an account.");
+    const greetingMessage = "Welcome to Drugs.ng! Your health companion in Africa. Are you a new user? Reply 'register' to sign up or 'login' if you already have an account.";
+    console.log(`📤 Sending new user greeting`);
+    await sendWhatsAppMessage(phoneNumber, greetingMessage);
   } else {
-    await sendWhatsAppMessage(phoneNumber, `Welcome back! How can I assist you today? You can ask me about medicines, doctors, orders, or type 'help' for assistance.`);
+    const welcomeBackMessage = `Welcome back! How can I assist you today? You can ask me about medicines, doctors, orders, or type 'help' for assistance.`;
+    console.log(`📤 Sending returning user welcome`);
+    await sendWhatsAppMessage(phoneNumber, welcomeBackMessage);
   }
 };
 

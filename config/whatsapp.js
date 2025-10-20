@@ -12,14 +12,24 @@ const whatsappAPI = axios.create({
 // Send message via WhatsApp
 const sendWhatsAppMessage = async (phoneNumber, message) => {
   try {
-    const response = await whatsappAPI.post(`/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    console.log(`📤 Sending WhatsApp message to ${phoneNumber}: "${message.substring(0, 50)}..."`);
+
+    const payload = {
       messaging_product: 'whatsapp',
       to: phoneNumber,
       text: { body: message }
-    });
+    };
+
+    const response = await whatsappAPI.post(`/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, payload);
+    console.log(`✅ Message sent successfully to ${phoneNumber}. Message ID:`, response.data.messages?.[0]?.id);
     return response.data;
   } catch (error) {
-    console.error('Error sending WhatsApp message:', error);
+    console.error(`❌ Error sending WhatsApp message to ${phoneNumber}:`, {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
     throw error;
   }
 };
