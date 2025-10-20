@@ -81,10 +81,7 @@ const validateEnvironment = () => {
     warnings.push('No payment provider configured (Flutterwave or Paystack). Payment features will be disabled.');
   }
   
-  // Check AI/NLP configuration
-  if (!process.env.DIALOGFLOW_PROJECT_ID) {
-    warnings.push('Dialogflow not configured. Using fallback NLP.');
-  }
+  // NLP Configuration - Using built-in custom NLP (no external service required)
   
   return { errors, warnings };
 };
