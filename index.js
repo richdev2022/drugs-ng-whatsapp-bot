@@ -7,7 +7,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { sequelize, initializeDatabase } = require('./models');
 const { sendWhatsAppMessage, markMessageAsRead } = require('./config/whatsapp');
-const { processMessage } = require('./services/nlp');
+const { processMessage, formatResponseWithOptions } = require('./services/nlp');
 const {
   registerUser,
   loginUser,
@@ -498,10 +498,11 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
     // Process with NLP
     console.log(`🤖 Processing with NLP...`);
-    const nlpResult = await processMessage(messageText, phoneNumber);
+    const isLoggedIn = session.state === 'LOGGED_IN';
+    const nlpResult = await processMessage(messageText, phoneNumber, session);
     const { intent, parameters, fulfillmentText } = nlpResult;
     console.log(`✨ NLP Result: intent="${intent}", source="${nlpResult.source}", confidence=${nlpResult.confidence}`);
-    
+
     // Handle different intents
     console.log(`🎯 Handling intent: ${intent}`);
     switch (intent) {
@@ -519,24 +520,45 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
         await handleLogin(phoneNumber, session, parameters);
         break;
 
+      case 'logout':
+        console.log(`🔒 Handling logout`);
+        await handleLogout(phoneNumber, session);
+        break;
+
       case 'search_products':
         console.log(`🔍 Handling product search`);
-        await handleProductSearch(phoneNumber, session, parameters);
+        if (!isLoggedIn && session.state !== 'NEW') {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleProductSearch(phoneNumber, session, parameters);
+        }
         break;
 
       case 'add_to_cart':
         console.log(`🛒 Handling add to cart`);
-        await handleAddToCart(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleAddToCart(phoneNumber, session, parameters);
+        }
         break;
 
       case 'place_order':
         console.log(`📦 Handling place order`);
-        await handlePlaceOrder(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handlePlaceOrder(phoneNumber, session, parameters);
+        }
         break;
 
       case 'track_order':
         console.log(`📍 Handling track order`);
-        await handleTrackOrder(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleTrackOrder(phoneNumber, session, parameters);
+        }
         break;
 
       case 'search_doctors':
@@ -546,17 +568,25 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
       case 'book_appointment':
         console.log(`📅 Handling book appointment`);
-        await handleBookAppointment(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleBookAppointment(phoneNumber, session, parameters);
+        }
         break;
 
       case 'payment':
         console.log(`💳 Handling payment`);
-        await handlePayment(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handlePayment(phoneNumber, session, parameters);
+        }
         break;
 
       case 'help':
         console.log(`ℹ️  Sending help message`);
-        await handleHelp(phoneNumber);
+        await handleHelp(phoneNumber, isLoggedIn);
         break;
 
       case 'support':
@@ -566,7 +596,8 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
       default:
         console.log(`❓ Unknown intent, sending fallback response`);
-        await sendWhatsAppMessage(phoneNumber, fulfillmentText || "I'm not sure how to help with that. Type 'help' for assistance.");
+        const responseWithOptions = formatResponseWithOptions(fulfillmentText || "I'm not sure how to help with that. Type 'help' for menu.", isLoggedIn);
+        await sendWhatsAppMessage(phoneNumber, responseWithOptions);
     }
     console.log(`✅ Successfully processed message from ${phoneNumber}\n`);
   } catch (error) {
@@ -671,6 +702,28 @@ const handleSupportCommand = async (supportTeam, commandText) => {
   }
 };
 
+// Send authentication required message
+const sendAuthRequiredMessage = async (phoneNumber) => {
+  const authMessage = `🔐 *Authentication Required*\n\nYou need to be logged in to access this feature.\n\nPlease login with your email and password:\nExample: login john@example.com mypassword\n\nOr register if you're new:\nExample: register John Doe john@example.com mypassword\n\n📋 Type "help" to see all options.`;
+  await sendWhatsAppMessage(phoneNumber, authMessage);
+};
+
+// Handle logout
+const handleLogout = async (phoneNumber, session) => {
+  console.log(`🔒 Handling logout for ${phoneNumber}`);
+  try {
+    session.state = 'NEW';
+    session.data = {};
+    await session.save();
+
+    const logoutMessage = "👋 You have been logged out successfully.\n\nType 'help' to get started again or 'login' to sign back in.";
+    await sendWhatsAppMessage(phoneNumber, logoutMessage);
+  } catch (error) {
+    console.error('Error during logout:', error);
+    await sendWhatsAppMessage(phoneNumber, "Sorry, there was an error logging you out. Please try again.");
+  }
+};
+
 // Handle greeting
 const handleGreeting = async (phoneNumber, session) => {
   console.log(`👋 Handling greeting for ${phoneNumber}, session state: ${session.state}`);
@@ -704,7 +757,8 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
 
         const validation = isValidRegistrationData(userData);
         if (!validation.valid) {
-          await sendWhatsAppMessage(phoneNumber, `Registration failed: ${validation.error}`);
+          const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+          await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
 
@@ -712,7 +766,7 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
         const result = await registerUser(userData);
 
         // Update session
-        session.state = 'REGISTERED';
+        session.state = 'LOGGED_IN';
         session.data.userId = result.userId;
         session.data.token = result.token;
         await session.save();
@@ -723,11 +777,13 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
           email: userData.email
         });
 
-        await sendWhatsAppMessage(phoneNumber, `✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`);
+        const successMsg = formatResponseWithOptions(`✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`, true);
+        await sendWhatsAppMessage(phoneNumber, successMsg);
       } catch (error) {
         console.error('Registration error:', error);
         const errorMessage = handleApiError(error, 'registration').message;
-        await sendWhatsAppMessage(phoneNumber, `❌ Registration failed: ${errorMessage}`);
+        const errorMsg = formatResponseWithOptions(`❌ Registration failed: ${errorMessage}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
       }
     } else {
       // Request missing parameters
@@ -738,10 +794,12 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
       if (!parameters.email) message += "• Email address (valid email format)\n";
       if (!parameters.password) message += "• Password (at least 6 characters)\n";
 
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, false);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
     }
   } else {
-    await sendWhatsAppMessage(phoneNumber, "You're already registered. Type 'help' to see available services.");
+    const msg = formatResponseWithOptions("You're already registered. Type 'help' to see available services.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
@@ -762,7 +820,8 @@ const handleLogin = async (phoneNumber, session, parameters) => {
         // Validate credentials
         const validation = isValidLoginData(credentials);
         if (!validation.valid) {
-          await sendWhatsAppMessage(phoneNumber, `❌ Login failed: ${validation.error}`);
+          const errorMsg = formatResponseWithOptions(`❌ Login failed: ${validation.error}`, false);
+          await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
 
@@ -775,11 +834,13 @@ const handleLogin = async (phoneNumber, session, parameters) => {
         session.data.token = result.token;
         await session.save();
 
-        await sendWhatsAppMessage(phoneNumber, `✅ Login successful! Welcome back to Drugs.ng. Type 'help' to see what you can do.`);
+        const successMsg = formatResponseWithOptions(`✅ Login successful! Welcome back to Drugs.ng. Type 'help' to see what you can do.`, true);
+        await sendWhatsAppMessage(phoneNumber, successMsg);
       } catch (error) {
         console.error('Login error:', error);
         const errorMessage = handleApiError(error, 'login').message;
-        await sendWhatsAppMessage(phoneNumber, `❌ Login failed: ${errorMessage}`);
+        const errorMsg = formatResponseWithOptions(`❌ Login failed: ${errorMessage}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
       }
     } else {
       // Request missing parameters
@@ -788,85 +849,103 @@ const handleLogin = async (phoneNumber, session, parameters) => {
       if (!parameters.email) message += "• Email address\n";
       if (!parameters.password) message += "• Password\n";
 
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, false);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
     }
   } else {
-    await sendWhatsAppMessage(phoneNumber, "You're already logged in. Type 'help' to see available services.");
+    const msg = formatResponseWithOptions("You're already logged in. Type 'help' to see available services.", true);
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle product search
 const handleProductSearch = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!parameters.product) {
-      await sendWhatsAppMessage(phoneNumber, "What medicine or product are you looking for? Please provide a name or category.");
+      const msg = formatResponseWithOptions("What medicine or product are you looking for? Please provide a name or category.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const products = await searchProducts(parameters.product);
-    
+
     if (products.length === 0) {
-      await sendWhatsAppMessage(phoneNumber, `Sorry, we couldn't find any products matching "${parameters.product}". Please try a different search term.`);
+      const msg = formatResponseWithOptions(`Sorry, we couldn't find any products matching "${parameters.product}". Please try a different search term.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     let message = `Here are some products matching "${parameters.product}":\n\n`;
-    
+
     products.slice(0, 5).forEach((product, index) => {
       message += `${index + 1}. ${product.name}\n`;
       message += `   Price: ₦${product.price}\n`;
       message += `   Category: ${product.category}\n\n`;
     });
-    
+
     message += `To add a product to your cart, reply with "add [product number] [quantity]"\nExample: "add 1 2" to add 2 units of the first product.`;
-    
+
     // Save search results in session for reference
     session.data.searchResults = products.slice(0, 5);
     await session.save();
-    
-    await sendWhatsAppMessage(phoneNumber, message);
+
+    const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
   } catch (error) {
     console.error('Error searching products:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while searching for products. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while searching for products. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle add to cart
 const handleAddToCart = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to add items to your cart. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to add items to your cart. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.productIndex || !parameters.quantity) {
-      await sendWhatsAppMessage(phoneNumber, "Please specify which product and quantity to add. Example: 'add 1 2' to add 2 units of the first product from your search results.");
+      const msg = formatResponseWithOptions("Please specify which product and quantity to add. Example: 'add 1 2' to add 2 units of the first product from your search results.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const productIndex = parseInt(parameters.productIndex) - 1;
     const quantity = parseInt(parameters.quantity);
-    
+
     if (!session.data.searchResults || !session.data.searchResults[productIndex]) {
-      await sendWhatsAppMessage(phoneNumber, "Please search for products first before adding to cart.");
+      const msg = formatResponseWithOptions("Please search for products first before adding to cart.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const product = session.data.searchResults[productIndex];
     const result = await addToCart(session.data.userId, product.id, quantity);
-    
-    await sendWhatsAppMessage(phoneNumber, `Added ${quantity} units of ${product.name} to your cart. Type 'cart' to view your cart or 'checkout' to place your order.`);
+
+    const successMsg = formatResponseWithOptions(`Added ${quantity} units of ${product.name} to your cart. Type 'cart' to view your cart or 'checkout' to place your order.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
   } catch (error) {
     console.error('Error adding to cart:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while adding to your cart. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while adding to your cart. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle place order
 const handlePlaceOrder = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to place an order. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to place an order. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -877,7 +956,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
       message += "• Flutterwave\n";
       message += "• Paystack\n";
       message += "• Cash on Delivery\n";
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
       return;
     }
 
@@ -889,7 +969,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
     // Validate order data
     const { isValidOrderData } = require('./utils/validation');
     if (!isValidOrderData(orderData)) {
-      await sendWhatsAppMessage(phoneNumber, "❌ Invalid delivery address or payment method. Please try again.");
+      const msg = formatResponseWithOptions("❌ Invalid delivery address or payment method. Please try again.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -902,7 +983,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
       amount: result.totalAmount || 'TBD'
     });
 
-    await sendWhatsAppMessage(phoneNumber, `✅ Your order has been placed successfully!\n\nOrder ID: #${result.orderId}`);
+    const successMsg = formatResponseWithOptions(`✅ Your order has been placed successfully!\n\nOrder ID: #${result.orderId}`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
 
     // Generate payment link if online payment is selected
     const validPaymentMethods = ['Flutterwave', 'Paystack'];
@@ -957,8 +1039,11 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
 // Handle track order
 const handleTrackOrder = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!parameters.orderId) {
-      await sendWhatsAppMessage(phoneNumber, "📍 To track your order, provide the order ID.\n\nExample: 'track 12345'");
+      const msg = formatResponseWithOptions("📍 To track your order, provide the order ID.\n\nExample: 'track 12345'", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -966,7 +1051,8 @@ const handleTrackOrder = async (phoneNumber, session, parameters) => {
     const orderDetails = await trackOrder(orderId);
 
     if (!orderDetails) {
-      await sendWhatsAppMessage(phoneNumber, `❌ Order #${orderId} not found. Please verify the order ID.`);
+      const msg = formatResponseWithOptions(`❌ Order #${orderId} not found. Please verify the order ID.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -995,183 +1081,191 @@ const handleTrackOrder = async (phoneNumber, session, parameters) => {
     message += `\n*Delivery Address:*\n${orderDetails.shippingAddress || 'Not provided'}\n\n`;
     message += `Need help? Type 'support' to chat with our team.`;
 
-    await sendWhatsAppMessage(phoneNumber, message);
+    const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
   } catch (error) {
     console.error('Error tracking order:', error);
     const errorMessage = handleApiError(error, 'track_order').message;
-    await sendWhatsAppMessage(phoneNumber, `❌ ${errorMessage}`);
+    const msg = formatResponseWithOptions(`❌ ${errorMessage}`, session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle doctor search
 const handleDoctorSearch = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!parameters.specialty) {
-      await sendWhatsAppMessage(phoneNumber, "What type of doctor are you looking for? Please provide a specialty (e.g., Cardiologist, Pediatrician).");
+      const msg = formatResponseWithOptions("What type of doctor are you looking for? Please provide a specialty (e.g., Cardiologist, Pediatrician).", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const location = parameters.location || 'Lagos';
     const doctors = await searchDoctors(parameters.specialty, location);
-    
+
     if (doctors.length === 0) {
-      await sendWhatsAppMessage(phoneNumber, `Sorry, we couldn't find any ${parameters.specialty} in ${location}. Please try a different specialty or location.`);
+      const msg = formatResponseWithOptions(`Sorry, we couldn't find any ${parameters.specialty} in ${location}. Please try a different specialty or location.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     let message = `Here are some ${parameters.specialty} doctors in ${location}:\n\n`;
-    
+
     doctors.slice(0, 5).forEach((doctor, index) => {
       message += `${index + 1}. Dr. ${doctor.name}\n`;
       message += `   Specialty: ${doctor.specialty}\n`;
       message += `   Location: ${doctor.location}\n`;
       message += `   Rating: ${doctor.rating}/5\n\n`;
     });
-    
+
     message += `To book an appointment, reply with "book [doctor number] [date] [time]"\nExample: "book 1 2023-06-15 14:00" to book the first doctor on June 15th at 2 PM.`;
-    
+
     // Save search results in session for reference
     session.data.doctorSearchResults = doctors.slice(0, 5);
     await session.save();
-    
-    await sendWhatsAppMessage(phoneNumber, message);
+
+    const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
   } catch (error) {
     console.error('Error searching doctors:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while searching for doctors. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while searching for doctors. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle book appointment
 const handleBookAppointment = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to book an appointment. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to book an appointment. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.doctorIndex || !parameters.date || !parameters.time) {
-      await sendWhatsAppMessage(phoneNumber, "Please specify which doctor, date, and time for your appointment. Example: 'book 1 2023-06-15 14:00' to book the first doctor on June 15th at 2 PM.");
+      const msg = formatResponseWithOptions("Please specify which doctor, date, and time for your appointment. Example: 'book 1 2023-06-15 14:00' to book the first doctor on June 15th at 2 PM.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const doctorIndex = parseInt(parameters.doctorIndex) - 1;
     const dateTime = new Date(`${parameters.date}T${parameters.time}`);
-    
+
     if (!session.data.doctorSearchResults || !session.data.doctorSearchResults[doctorIndex]) {
-      await sendWhatsAppMessage(phoneNumber, "Please search for doctors first before booking an appointment.");
+      const msg = formatResponseWithOptions("Please search for doctors first before booking an appointment.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const doctor = session.data.doctorSearchResults[doctorIndex];
     const result = await bookAppointment(session.data.userId, doctor.id, dateTime);
-    
+
     // Notify support team
     await notifySupportTeam(phoneNumber, 'medical', 'New Appointment Booked', {
       doctorName: doctor.name,
       dateTime: dateTime.toISOString()
     });
-    
-    await sendWhatsAppMessage(phoneNumber, `Your appointment with Dr. ${doctor.name} has been scheduled for ${dateTime.toLocaleString()}. Appointment ID: ${result.appointmentId}. You will receive a confirmation shortly.`);
+
+    const successMsg = formatResponseWithOptions(`Your appointment with Dr. ${doctor.name} has been scheduled for ${dateTime.toLocaleString()}. Appointment ID: ${result.appointmentId}. You will receive a confirmation shortly.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
   } catch (error) {
     console.error('Error booking appointment:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while booking your appointment. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while booking your appointment. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle payment
 const handlePayment = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to make a payment. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to make a payment. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.orderId || !parameters.provider) {
-      await sendWhatsAppMessage(phoneNumber, "Please provide your order ID and payment provider. Example: 'pay 12345 flutterwave'");
+      const msg = formatResponseWithOptions("Please provide your order ID and payment provider. Example: 'pay 12345 flutterwave'", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     let result;
     const paymentDetails = {
-      amount: 0, // This would be fetched from the order
-      email: '', // This would be fetched from the user
+      amount: 0,
+      email: '',
       orderId: parameters.orderId
     };
-    
+
     // Get order details to populate payment info
     try {
       const orderDetails = await trackOrder(parameters.orderId);
       paymentDetails.amount = orderDetails.totalAmount;
-      
+
       // Get user email
       const user = await sequelize.models.User.findByPk(session.data.userId);
       paymentDetails.email = user.email;
     } catch (error) {
-      await sendWhatsAppMessage(phoneNumber, "Sorry, we couldn't find that order. Please check the order ID and try again.");
+      const msg = formatResponseWithOptions("Sorry, we couldn't find that order. Please check the order ID and try again.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (parameters.provider.toLowerCase() === 'flutterwave') {
       result = await processFlutterwavePayment(paymentDetails);
-      await sendWhatsAppMessage(phoneNumber, `Please complete your payment using this link: ${result.data.link}`);
+      const paymentMsg = formatResponseWithOptions(`Please complete your payment using this link: ${result.data.link}`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, paymentMsg);
     } else if (parameters.provider.toLowerCase() === 'paystack') {
       result = await processPaystackPayment(paymentDetails);
-      await sendWhatsAppMessage(phoneNumber, `Please complete your payment using this link: ${result.data.authorization_url}`);
+      const paymentMsg = formatResponseWithOptions(`Please complete your payment using this link: ${result.data.authorization_url}`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, paymentMsg);
     } else {
-      await sendWhatsAppMessage(phoneNumber, "Sorry, we only support Flutterwave and Paystack for online payments.");
+      const msg = formatResponseWithOptions("Sorry, we only support Flutterwave and Paystack for online payments.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
     }
   } catch (error) {
     console.error('Error processing payment:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while processing your payment. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while processing your payment. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
 // Handle help
-const handleHelp = async (phoneNumber) => {
-  const helpMessage = `
-Drugs.ng WhatsApp Bot Help:
+const handleHelp = async (phoneNumber, isLoggedIn) => {
+  const helpMessage = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
 
-1. *Search for Medicines*
-   Example: "Find paracetamol"
+1️⃣ *Search Medicines* - Type "1" or "Find paracetamol"
+2️⃣ *Find Doctors* - Type "2" or "Find a cardiologist"
+3️⃣ *Track Orders* - Type "3" or "Track 12345"
+4️⃣ *Book Appointment* - Type "4" or "Book a doctor"
+5️⃣ *Place Order* - Type "5" or "Order medicines"
+6️⃣ *Customer Support* - Type "6" or "Connect me to support"
 
-2. *Search for Doctors*
-   Example: "Find a cardiologist in Lagos"
+Simply reply with a number (1-6) or describe what you need!`;
 
-3. *Order Medicines*
-   - Search for products first
-   - Add to cart: "add 1 2" (adds 2 units of product #1)
-   - Place order: "order 123 Main St, Lagos Flutterwave"
-
-4. *Track Orders*
-   Example: "track 12345"
-
-5. *Book Appointments*
-   - Search for doctors first
-   - Book: "book 1 2023-06-15 14:00"
-
-6. *Account Management*
-   - Register: "register John Doe john@example.com password"
-   - Login: "login john@example.com password"
-
-7. *Customer Support*
-   Type "support" to chat with our team
-
-Reply with the number or keyword of the service you need.
-`;
-
-  await sendWhatsAppMessage(phoneNumber, helpMessage);
+  const messageWithOptions = formatResponseWithOptions(helpMessage, isLoggedIn);
+  await sendWhatsAppMessage(phoneNumber, messageWithOptions);
 };
 
 // Handle support request
 const handleSupportRequest = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
     const supportRole = parameters.supportType || 'general';
     const result = await startSupportChat(phoneNumber, supportRole);
-    
-    await sendWhatsAppMessage(phoneNumber, `You've been connected to our ${supportRole} support team. Please describe your issue and a support agent will assist you shortly.`);
+
+    const msg = formatResponseWithOptions(`You've been connected to our ${supportRole} support team. Please describe your issue and a support agent will assist you shortly.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msg);
   } catch (error) {
     console.error('Error starting support chat:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while connecting you to support. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while connecting you to support. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 

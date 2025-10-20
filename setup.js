@@ -36,7 +36,6 @@ if (fs.existsSync('.env')) {
     (process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD);
   
   const optionalVars = [
-    'DIALOGFLOW_PROJECT_ID',
     'FLUTTERWAVE_PUBLIC_KEY',
     'FLUTTERWAVE_SECRET_KEY',
     'FLUTTERWAVE_SECRET_HASH',
@@ -82,24 +81,9 @@ if (fs.existsSync('.env')) {
 }
 console.log();
 
-// Check if service-account-key.json exists
-console.log('2. Checking Dialogflow credentials...');
-if (fs.existsSync('service-account-key.json')) {
-  const keyContent = fs.readFileSync('service-account-key.json', 'utf8');
-  if (keyContent.includes('YOUR_DIALOGFLOW_PROJECT_ID')) {
-    console.log('   ⚠ service-account-key.json found but contains placeholder values');
-    console.log('   → Replace with actual Google Cloud service account key');
-    console.log('   → Dialogflow will not work, but fallback NLP is available');
-    hasWarnings = true;
-  } else {
-    console.log('   ✓ service-account-key.json found with actual credentials');
-  }
-} else {
-  console.log('   ⚠ service-account-key.json NOT found');
-  console.log('   → Download from Google Cloud Console');
-  console.log('   → Dialogflow will not work, but fallback NLP is available');
-  hasWarnings = true;
-}
+// NLP Configuration - Using built-in custom NLP
+console.log('2. Checking NLP configuration...');
+console.log('   ✓ Using built-in custom NLP (no external service required)');
 console.log();
 
 // Check if node_modules exists
@@ -115,7 +99,6 @@ if (fs.existsSync('node_modules')) {
     'axios',
     'bcryptjs',
     'crypto-js',
-    'dialogflow',
     'dotenv'
   ];
   

@@ -16,7 +16,6 @@ const OPTIONAL_ENV_VARS = {
   'PORT': '3000',
   'NODE_ENV': 'development',
   'LOG_LEVEL': 'info',
-  'DIALOGFLOW_PROJECT_ID': null,
   'FLUTTERWAVE_PUBLIC_KEY': null,
   'FLUTTERWAVE_SECRET_KEY': null,
   'FLUTTERWAVE_SECRET_HASH': null,
@@ -82,10 +81,7 @@ const validateEnvironment = () => {
     warnings.push('No payment provider configured (Flutterwave or Paystack). Payment features will be disabled.');
   }
   
-  // Check AI/NLP configuration
-  if (!process.env.DIALOGFLOW_PROJECT_ID) {
-    warnings.push('Dialogflow not configured. Using fallback NLP.');
-  }
+  // NLP Configuration - Using built-in custom NLP (no external service required)
   
   return { errors, warnings };
 };
@@ -111,8 +107,6 @@ const getEnv = () => ({
   // Encryption
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   
-  // Dialogflow
-  DIALOGFLOW_PROJECT_ID: process.env.DIALOGFLOW_PROJECT_ID,
   
   // Flutterwave
   FLUTTERWAVE_PUBLIC_KEY: process.env.FLUTTERWAVE_PUBLIC_KEY,
