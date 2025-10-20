@@ -244,7 +244,7 @@ app.post('/webhook', async (req, res) => {
                     session.data.pendingPrescriptionUrl = uploadResult.url;
                     await session.save();
 
-                    await sendWhatsAppMessage(phoneNumber, '📄 Prescription received. Reply with your order ID to attach it. Example: rx 12345');
+                    await sendWhatsAppMessage(phoneNumber, '📄 Prescription received.\n\nTo attach it to an order, reply now with your Order ID.\nExample: rx 12345\n\nNext time, you can auto-attach by adding a caption to your file: \n• rx 12345\n• order 12345\n• prescription 12345\n\nWhere to find your Order ID:\n• In your order confirmation message (look for "Order ID: #12345")\n• If you know it, check status with: track 12345\n• If you can’t find it, type "support" and we’ll help link it for you.');
                   }
                 }
               } catch (err) {
@@ -891,7 +891,7 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
       }
       return;
     } else {
-      await sendWhatsAppMessage(phoneNumber, 'No prescription file is pending. Please send an image or PDF of your prescription first.');
+      await sendWhatsAppMessage(phoneNumber, 'No prescription file is pending.\n\nPlease send an image or PDF of your prescription first. Supported types: JPG, PNG, WEBP, GIF, PDF.\n\nTip: Add a caption with your Order ID to auto-attach, e.g. rx 12345 (also accepts "order 12345" or "prescription 12345"). If you don’t know your Order ID, check your order confirmation message or type "support" for help.');
       return;
     }
   }
@@ -1646,8 +1646,9 @@ const handleHelp = async (phoneNumber, isLoggedIn) => {
 4️⃣ *Book Appointment* - Type "4" or "Book a doctor"
 5️⃣ *Place Order* - Type "5" or "Order medicines"
 6️⃣ *Customer Support* - Type "6" or "Connect me to support"
+7️⃣ *Upload Prescription* (image or PDF) - Send your file. To auto-attach, add a caption with your Order ID, e.g.: rx 12345 (also accepts "order 12345" or "prescription 12345"). Find your Order ID in your order confirmation message (e.g., "Order ID: #12345"). If unsure, type "support" and we’ll help link it.
 
-Simply reply with a number (1-6) or describe what you need!`;
+Simply reply with a number (1-7) or describe what you need!`;
 
   const messageWithOptions = formatResponseWithOptions(helpMessage, isLoggedIn);
   await sendWhatsAppMessage(phoneNumber, messageWithOptions);
