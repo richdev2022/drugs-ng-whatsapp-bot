@@ -406,6 +406,275 @@ const Cart = sequelize.define('Cart', {
   tableName: 'carts'
 });
 
+// OTP Model for email verification
+const OTP = sequelize.define('OTP', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    index: true
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  purpose: {
+    type: DataTypes.ENUM('registration', 'password_reset', 'email_verification'),
+    defaultValue: 'email_verification'
+  },
+  expiresAt: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  isUsed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  usedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  }
+}, {
+  tableName: 'otps',
+  indexes: [
+    {
+      fields: ['email', 'purpose']
+    }
+  ]
+});
+
+// Diagnostic Tests Model
+const DiagnosticTest = sequelize.define('DiagnosticTest', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.TEXT
+  },
+  price: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  sampleType: {
+    type: DataTypes.STRING,
+    comment: 'e.g., Blood, Urine, Saliva'
+  },
+  collectionTime: {
+    type: DataTypes.STRING,
+    comment: 'e.g., 30 minutes, 1 hour'
+  },
+  resultTime: {
+    type: DataTypes.STRING,
+    comment: 'e.g., 24 hours, 48 hours'
+  },
+  labPartner: {
+    type: DataTypes.STRING,
+    comment: 'Name of the lab providing the test'
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'diagnostic_tests'
+});
+
+// Healthcare Products Model
+const HealthcareProduct = sequelize.define('HealthcareProduct', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'e.g., First Aid, Medical Devices, Health Supplements'
+  },
+  description: {
+    type: DataTypes.TEXT
+  },
+  price: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  stock: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  brand: {
+    type: DataTypes.STRING
+  },
+  usage: {
+    type: DataTypes.TEXT,
+    comment: 'How to use the product'
+  },
+  imageUrl: {
+    type: DataTypes.STRING
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'healthcare_products'
+});
+
+// Diagnostic Test Booking Model
+const DiagnosticBooking = sequelize.define('DiagnosticBooking', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+  diagnosticTestId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: DiagnosticTest,
+      key: 'id'
+    }
+  },
+  sampleCollectionDate: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  sampleCollectionLocation: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.ENUM('Scheduled', 'Completed', 'Cancelled', 'Pending'),
+    defaultValue: 'Pending'
+  },
+  totalAmount: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  paymentStatus: {
+    type: DataTypes.ENUM('Pending', 'Paid', 'Failed'),
+    defaultValue: 'Pending'
+  },
+  paymentReference: {
+    type: DataTypes.STRING
+  },
+  notes: {
+    type: DataTypes.TEXT
+  }
+}, {
+  tableName: 'diagnostic_bookings'
+});
+
+// Support Rating Model
+const SupportRating = sequelize.define('SupportRating', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  supportChatId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  customerPhoneNumber: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  supportTeamId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'support_teams',
+      key: 'id'
+    }
+  },
+  rating: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 1,
+      max: 5
+    }
+  },
+  feedback: {
+    type: DataTypes.TEXT
+  },
+  ratedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+}, {
+  tableName: 'support_ratings'
+});
+
+// Prescription Model for medicine orders
+const Prescription = sequelize.define('Prescription', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  orderId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Order,
+      key: 'id'
+    }
+  },
+  fileUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'URL or path to the prescription file (PDF/Image)'
+  },
+  extractedText: {
+    type: DataTypes.TEXT,
+    comment: 'OCR extracted text from prescription'
+  },
+  verificationStatus: {
+    type: DataTypes.ENUM('Pending', 'Verified', 'Rejected'),
+    defaultValue: 'Pending'
+  },
+  pharmacistNotes: {
+    type: DataTypes.TEXT
+  },
+  verifiedBy: {
+    type: DataTypes.STRING,
+    comment: 'Pharmacist name or ID'
+  },
+  verifiedAt: {
+    type: DataTypes.DATE
+  }
+}, {
+  tableName: 'prescriptions'
+});
+
 // Define relationships
 User.hasMany(Order, { foreignKey: 'userId' });
 Order.belongsTo(User, { foreignKey: 'userId' });
