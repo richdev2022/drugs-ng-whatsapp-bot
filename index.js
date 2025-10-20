@@ -340,6 +340,152 @@ app.post('/webhook/paystack', async (req, res) => {
   }
 });
 
+// Healthcare Product Image Upload
+app.post('/api/healthcare-products/upload-image', uploadSingleFile, async (req, res) => {
+  try {
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const { productId, filename } = req.body;
+    const metadata = getFileMetadata(req.file);
+
+    // Upload image to Cloudinary
+    const result = await uploadProductImage(req.file.buffer, productId, filename);
+
+    res.json({
+      success: true,
+      message: 'Healthcare product image uploaded successfully',
+      data: {
+        url: result.url,
+        publicId: result.publicId,
+        fileSize: metadata.size,
+        mimeType: metadata.mimeType
+      }
+    });
+  } catch (error) {
+    console.error('Healthcare product image upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload healthcare product image'
+    });
+  }
+});
+
+// Get Healthcare Product Image URL
+app.get('/api/healthcare-products/:productId/image', async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Product ID is required'
+      });
+    }
+
+    const result = await getProductImageUrl(productId);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get product image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get product image'
+    });
+  }
+});
+
+// Update Healthcare Product Image
+app.put('/api/healthcare-products/:productId/image', uploadSingleFile, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { filename } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Product ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const result = await updateProductImage(productId, req.file.buffer, filename);
+
+    res.json({
+      success: true,
+      message: 'Product image updated successfully',
+      data: {
+        productId: result.productId,
+        imageUrl: result.imageUrl
+      }
+    });
+  } catch (error) {
+    console.error('Update product image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update product image'
+    });
+  }
+});
+
+// Prescription File Upload
+app.post('/api/prescriptions/upload', uploadSingleFile, async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const metadata = getFileMetadata(req.file);
+
+    // Upload prescription to Cloudinary
+    const result = await uploadAndSavePrescription(orderId, req.file.buffer, metadata.originalName);
+
+    res.json({
+      success: true,
+      message: 'Prescription uploaded successfully',
+      data: {
+        prescriptionId: result.prescriptionId,
+        fileUrl: result.fileUrl,
+        verificationStatus: result.verificationStatus
+      }
+    });
+  } catch (error) {
+    console.error('Prescription upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload prescription'
+    });
+  }
+});
+
 // Payment callback page (for redirect after payment)
 app.get('/payment/callback', async (req, res) => {
   try {
