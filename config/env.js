@@ -16,7 +16,6 @@ const OPTIONAL_ENV_VARS = {
   'PORT': '3000',
   'NODE_ENV': 'development',
   'LOG_LEVEL': 'info',
-  'DIALOGFLOW_PROJECT_ID': null,
   'FLUTTERWAVE_PUBLIC_KEY': null,
   'FLUTTERWAVE_SECRET_KEY': null,
   'FLUTTERWAVE_SECRET_HASH': null,
