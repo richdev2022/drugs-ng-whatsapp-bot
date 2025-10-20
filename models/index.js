@@ -793,6 +793,50 @@ const seedInitialData = async () => {
         console.warn('⚠️  Could not seed doctors:', error.message);
       }
     }
+
+    // Seed diagnostic tests
+    const diagnosticTestCount = await DiagnosticTest.count();
+    if (diagnosticTestCount === 0) {
+      try {
+        const sampleDiagnosticTests = [
+          { name: "Blood Test (Full Blood Count)", category: "Blood Tests", description: "Complete blood count (CBC) test", price: 2500, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "24 hours", labPartner: "Lancet Laboratories", isActive: true },
+          { name: "COVID-19 Rapid Test", category: "Rapid Tests", description: "COVID-19 antigen rapid test", price: 1500, sampleType: "Nasal Swab", collectionTime: "5 minutes", resultTime: "15 minutes", labPartner: "Medplus Labs", isActive: true },
+          { name: "Blood Sugar Test", category: "Metabolic Tests", description: "Fasting glucose test", price: 1500, sampleType: "Blood", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Pathcare Diagnostics", isActive: true },
+          { name: "Thyroid Function Test", category: "Endocrine Tests", description: "TSH, T3, T4 levels", price: 3000, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "48 hours", labPartner: "Lancet Laboratories", isActive: true },
+          { name: "Lipid Profile", category: "Metabolic Tests", description: "Cholesterol and triglycerides test", price: 2000, sampleType: "Blood", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Medplus Labs", isActive: true },
+          { name: "Urinalysis", category: "Urinary Tests", description: "Complete urine analysis", price: 1000, sampleType: "Urine", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Pathcare Diagnostics", isActive: true },
+          { name: "Malaria Test", category: "Infectious Disease Tests", description: "Blood smear and rapid malaria test", price: 1800, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "30 minutes", labPartner: "Medplus Labs", isActive: true },
+          { name: "Typhoid Test", category: "Infectious Disease Tests", description: "Typhoid screening test", price: 2000, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "24 hours", labPartner: "Lancet Laboratories", isActive: true }
+        ];
+
+        await DiagnosticTest.bulkCreate(sampleDiagnosticTests, { ignoreDuplicates: true });
+        console.log('✓ Sample diagnostic tests seeded');
+      } catch (error) {
+        console.warn('⚠️  Could not seed diagnostic tests:', error.message);
+      }
+    }
+
+    // Seed healthcare products
+    const healthcareProductCount = await HealthcareProduct.count();
+    if (healthcareProductCount === 0) {
+      try {
+        const sampleHealthcareProducts = [
+          { name: "First Aid Kit", category: "First Aid", description: "Complete home first aid kit", price: 3500, stock: 50, brand: "SafeFirst", usage: "For minor injuries and emergency care", isActive: true },
+          { name: "Digital Thermometer", category: "Medical Devices", description: "Fast and accurate temperature reading", price: 2000, stock: 75, brand: "Braun", usage: "Place under tongue for 30 seconds", isActive: true },
+          { name: "Oximeter", category: "Medical Devices", description: "Finger pulse oximeter", price: 4500, stock: 40, brand: "Omron", usage: "Place finger in device and press button", isActive: true },
+          { name: "Glucose Meter", category: "Medical Devices", description: "Blood glucose monitoring device", price: 5000, stock: 30, brand: "Accu-Chek", usage: "Use with test strips for glucose reading", isActive: true },
+          { name: "Elastic Bandage", category: "First Aid", description: "Compression wrap for sprains", price: 800, stock: 100, brand: "3M", usage: "Wrap around affected area firmly", isActive: true },
+          { name: "Sterile Gauze Pads", category: "First Aid", description: "Pack of 10 sterile gauze pads", price: 500, stock: 150, brand: "Johnson & Johnson", usage: "For wound cleaning and dressing", isActive: true },
+          { name: "Antibiotic Cream", category: "First Aid", description: "Antibacterial ointment", price: 600, stock: 80, brand: "Neosporin", usage: "Apply to minor cuts and scrapes", isActive: true },
+          { name: "Pain Relief Gel", category: "Topical", description: "Menthol-based pain relief gel", price: 1200, stock: 60, brand: "Volini", usage: "Apply to affected area and massage", isActive: true }
+        ];
+
+        await HealthcareProduct.bulkCreate(sampleHealthcareProducts, { ignoreDuplicates: true });
+        console.log('✓ Sample healthcare products seeded');
+      } catch (error) {
+        console.warn('⚠️  Could not seed healthcare products:', error.message);
+      }
+    }
   } catch (error) {
     console.error('❌ Error seeding initial data:', error.message);
   }
