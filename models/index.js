@@ -810,5 +810,11 @@ module.exports = {
   SupportTeam,
   SupportChat,
   Cart,
+  OTP,
+  DiagnosticTest,
+  HealthcareProduct,
+  DiagnosticBooking,
+  SupportRating,
+  Prescription,
   initializeDatabase
 };
