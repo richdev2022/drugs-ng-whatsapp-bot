@@ -17,8 +17,10 @@ const HELP_MESSAGE = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
 4️⃣ *Book Appointment* - Type "4" or "book a doctor"
 5️⃣ *Place Order* - Type "5" or "order medicines"
 6️⃣ *Customer Support* - Type "6" or "connect me to support"
+7️⃣ *Book Diagnostic Tests* - Type "7" or "book a blood test"
+8️⃣ *Healthcare Products* - Type "8" or "browse health products"
 
-Simply reply with a number (1-6) or describe what you need!`;
+Simply reply with a number (1-8) or describe what you need!`;
 
 const processMessage = async (message, phoneNumber, session) => {
   try {
