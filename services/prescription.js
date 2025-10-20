@@ -276,6 +276,7 @@ module.exports = {
   extractPrescriptionText,
   parsePrescriptionText,
   savePrescription,
+  uploadAndSavePrescription,
   getPrescription,
   verifyPrescription,
   getPendingPrescriptions,
