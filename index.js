@@ -453,40 +453,49 @@ app.get('/health', (req, res) => {
 // Handle customer message
 const handleCustomerMessage = async (phoneNumber, messageText) => {
   try {
+    console.log(`\n🔄 [${phoneNumber}] Processing customer message: "${messageText}"`);
+
     // Check rate limit
     const rateLimitResult = await checkRateLimit(phoneNumber);
     if (!rateLimitResult.allowed) {
+      console.log(`⚠️  Rate limit exceeded for ${phoneNumber}`);
       await sendWhatsAppMessage(phoneNumber, rateLimitResult.message);
       return;
     }
-    
+
     // Get or create user session
     let session = await sequelize.models.Session.findOne({
       where: { phoneNumber }
     });
-    
+
     if (!session) {
+      console.log(`📝 Creating new session for ${phoneNumber}`);
       session = await sequelize.models.Session.create({
         phoneNumber,
         state: 'NEW',
         data: {}
       });
+    } else {
+      console.log(`📝 Found existing session for ${phoneNumber}, state: ${session.state}`);
     }
-    
+
     // Update last activity
     session.lastActivity = new Date();
     await session.save();
-    
+
     // Check if in support chat
     if (session.state === 'SUPPORT_CHAT') {
+      console.log(`💬 ${phoneNumber} is in support chat, forwarding message`);
       // Forward message to support team
       await sendSupportMessage(phoneNumber, messageText, true);
       return;
     }
-    
+
     // Process with NLP
+    console.log(`🤖 Processing with NLP...`);
     const nlpResult = await processMessage(messageText, phoneNumber);
     const { intent, parameters, fulfillmentText } = nlpResult;
+    console.log(`✨ NLP Result: intent="${intent}", source="${nlpResult.source}", confidence=${nlpResult.confidence}`);
     
     // Handle different intents
     switch (intent) {
