@@ -650,10 +650,15 @@ const handleSupportCommand = async (supportTeam, commandText) => {
 
 // Handle greeting
 const handleGreeting = async (phoneNumber, session) => {
+  console.log(`👋 Handling greeting for ${phoneNumber}, session state: ${session.state}`);
   if (session.state === 'NEW') {
-    await sendWhatsAppMessage(phoneNumber, "Welcome to Drugs.ng! Your health companion in Africa. Are you a new user? Reply 'register' to sign up or 'login' if you already have an account.");
+    const greetingMessage = "Welcome to Drugs.ng! Your health companion in Africa. Are you a new user? Reply 'register' to sign up or 'login' if you already have an account.";
+    console.log(`📤 Sending new user greeting`);
+    await sendWhatsAppMessage(phoneNumber, greetingMessage);
   } else {
-    await sendWhatsAppMessage(phoneNumber, `Welcome back! How can I assist you today? You can ask me about medicines, doctors, orders, or type 'help' for assistance.`);
+    const welcomeBackMessage = `Welcome back! How can I assist you today? You can ask me about medicines, doctors, orders, or type 'help' for assistance.`;
+    console.log(`📤 Sending returning user welcome`);
+    await sendWhatsAppMessage(phoneNumber, welcomeBackMessage);
   }
 };
 
