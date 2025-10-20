@@ -4,7 +4,9 @@ const FEATURE_COMMANDS = {
   '3': { intent: 'track_order', label: 'Track Orders' },
   '4': { intent: 'book_appointment', label: 'Book Appointment' },
   '5': { intent: 'place_order', label: 'Place Order' },
-  '6': { intent: 'support', label: 'Customer Support' }
+  '6': { intent: 'support', label: 'Customer Support' },
+  '7': { intent: 'diagnostic_tests', label: 'Book Diagnostic Tests' },
+  '8': { intent: 'healthcare_products', label: 'Browse Healthcare Products' }
 };
 
 const HELP_MESSAGE = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
@@ -15,8 +17,10 @@ const HELP_MESSAGE = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
 4️⃣ *Book Appointment* - Type "4" or "book a doctor"
 5️⃣ *Place Order* - Type "5" or "order medicines"
 6️⃣ *Customer Support* - Type "6" or "connect me to support"
+7️⃣ *Book Diagnostic Tests* - Type "7" or "book a blood test"
+8️⃣ *Healthcare Products* - Type "8" or "browse health products"
 
-Simply reply with a number (1-6) or describe what you need!`;
+Simply reply with a number (1-8) or describe what you need!`;
 
 const processMessage = async (message, phoneNumber, session) => {
   try {
@@ -107,6 +111,28 @@ const processMessage = async (message, phoneNumber, session) => {
       return createResponse('support', {}, 'Connecting you to our support team...');
     }
 
+    // Diagnostic tests intents
+    if (/^(diagnostic|test|blood test|lab test|screening|check up|medical test)/.test(lowerMessage) ||
+        lowerMessage === '7') {
+      return handleDiagnosticTestIntent(message);
+    }
+
+    // Healthcare products intents
+    if (/^(healthcare|health care|products|browse|equipment|devices|supplies)/.test(lowerMessage) ||
+        lowerMessage === '8') {
+      return handleHealthcareProductIntent(message);
+    }
+
+    // Password reset intents
+    if (/^(forgot|reset|change|password)/.test(lowerMessage)) {
+      return createResponse('password_reset', {}, "I'll help you reset your password. Please provide your email address.");
+    }
+
+    // Prescription upload intents
+    if (/^(upload|prescription|script|rx|medicine prescription)/.test(lowerMessage)) {
+      return createResponse('prescription_upload', {}, 'Please upload your prescription document (image or PDF) by sending it as an attachment.');
+    }
+
     // Default: Try to extract intent from keywords
     const extractedIntent = extractIntentFromMessage(lowerMessage);
     if (extractedIntent && extractedIntent.intent !== 'unknown') {
@@ -134,6 +160,10 @@ const createResponse = (intent, parameters = {}, fulfillmentText = null, source 
     book_appointment: 'I can help you book an appointment. Please provide the doctor and your preferred date and time.',
     payment: 'I can help you make a payment. Please provide your order ID and preferred payment method.',
     support: 'Connecting you to our support team. Please describe your issue.',
+    diagnostic_tests: 'What diagnostic test would you like to book? (e.g., blood test, malaria test, thyroid test)',
+    healthcare_products: 'What healthcare product would you like to browse? (e.g., first aid kit, thermometer, oximeter)',
+    password_reset: "I'll help you reset your password. Please provide your email address.",
+    prescription_upload: 'Please upload your prescription document (image or PDF) by sending it as an attachment.',
     logout: 'You have been logged out. Type "help" to get started again.',
     unknown: "I'm not sure how to help with that. Type 'help' to see available options.",
     error: 'I encountered an error. Please try again.'
@@ -346,6 +376,44 @@ const handlePaymentIntent = (message) => {
   }
 
   return createResponse('payment', parameters);
+};
+
+const handleDiagnosticTestIntent = (message) => {
+  const parameters = {};
+  const lowerMessage = message.toLowerCase();
+
+  const testKeywords = [
+    'blood test', 'covid test', 'malaria test', 'typhoid test', 'thyroid test',
+    'glucose test', 'lipid profile', 'urinalysis', 'full blood count'
+  ];
+
+  for (const test of testKeywords) {
+    if (lowerMessage.includes(test)) {
+      parameters.testType = test;
+      break;
+    }
+  }
+
+  return createResponse('diagnostic_tests', parameters);
+};
+
+const handleHealthcareProductIntent = (message) => {
+  const parameters = {};
+  const lowerMessage = message.toLowerCase();
+
+  const categories = [
+    'first aid', 'medical devices', 'thermometer', 'oximeter', 'glucose meter',
+    'bandage', 'gauze', 'cream', 'gel', 'kit'
+  ];
+
+  for (const category of categories) {
+    if (lowerMessage.includes(category)) {
+      parameters.category = category;
+      break;
+    }
+  }
+
+  return createResponse('healthcare_products', parameters);
 };
 
 const extractIntentFromMessage = (lowerMessage) => {

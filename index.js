@@ -31,6 +31,19 @@ const {
   endSupportChat,
   getUnreadSupportMessages
 } = require('./services/support');
+const { uploadSingleFile, validateUploadedFile, getFileMetadata } = require('./utils/uploadHandler');
+const {
+  uploadProductImage,
+  updateProductImage,
+  getProductImageUrl
+} = require('./services/healthcareProducts');
+const { uploadAndSavePrescription } = require('./services/prescription');
+const {
+  uploadDoctorImage,
+  updateDoctorImage,
+  getDoctorImageUrl,
+  getDoctorsWithImages
+} = require('./services/doctorImages');
 
 const app = express();
 const PORT = ENV.PORT || 3000;
@@ -333,6 +346,283 @@ app.post('/webhook/paystack', async (req, res) => {
   }
 });
 
+// Healthcare Product Image Upload
+app.post('/api/healthcare-products/upload-image', uploadSingleFile, async (req, res) => {
+  try {
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const { productId, filename } = req.body;
+    const metadata = getFileMetadata(req.file);
+
+    // Upload image to Cloudinary
+    const result = await uploadProductImage(req.file.buffer, productId, filename);
+
+    res.json({
+      success: true,
+      message: 'Healthcare product image uploaded successfully',
+      data: {
+        url: result.url,
+        publicId: result.publicId,
+        fileSize: metadata.size,
+        mimeType: metadata.mimeType
+      }
+    });
+  } catch (error) {
+    console.error('Healthcare product image upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload healthcare product image'
+    });
+  }
+});
+
+// Get Healthcare Product Image URL
+app.get('/api/healthcare-products/:productId/image', async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Product ID is required'
+      });
+    }
+
+    const result = await getProductImageUrl(productId);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get product image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get product image'
+    });
+  }
+});
+
+// Update Healthcare Product Image
+app.put('/api/healthcare-products/:productId/image', uploadSingleFile, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { filename } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Product ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const result = await updateProductImage(productId, req.file.buffer, filename);
+
+    res.json({
+      success: true,
+      message: 'Product image updated successfully',
+      data: {
+        productId: result.productId,
+        imageUrl: result.imageUrl
+      }
+    });
+  } catch (error) {
+    console.error('Update product image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update product image'
+    });
+  }
+});
+
+// Prescription File Upload
+app.post('/api/prescriptions/upload', uploadSingleFile, async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const metadata = getFileMetadata(req.file);
+
+    // Upload prescription to Cloudinary
+    const result = await uploadAndSavePrescription(orderId, req.file.buffer, metadata.originalName);
+
+    res.json({
+      success: true,
+      message: 'Prescription uploaded successfully',
+      data: {
+        prescriptionId: result.prescriptionId,
+        fileUrl: result.fileUrl,
+        verificationStatus: result.verificationStatus
+      }
+    });
+  } catch (error) {
+    console.error('Prescription upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload prescription'
+    });
+  }
+});
+
+// Doctor Profile Image Upload
+app.post('/api/doctors/upload-image', uploadSingleFile, async (req, res) => {
+  try {
+    const { doctorId, filename } = req.body;
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const metadata = getFileMetadata(req.file);
+
+    // Upload image to Cloudinary
+    const result = await uploadDoctorImage(req.file.buffer, doctorId, filename);
+
+    res.json({
+      success: true,
+      message: 'Doctor image uploaded successfully',
+      data: {
+        url: result.url,
+        publicId: result.publicId,
+        fileSize: metadata.size,
+        mimeType: metadata.mimeType
+      }
+    });
+  } catch (error) {
+    console.error('Doctor image upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload doctor image'
+    });
+  }
+});
+
+// Get Doctor Profile Image
+app.get('/api/doctors/:doctorId/image', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doctor ID is required'
+      });
+    }
+
+    const result = await getDoctorImageUrl(doctorId);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get doctor image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get doctor image'
+    });
+  }
+});
+
+// Update Doctor Profile Image
+app.put('/api/doctors/:doctorId/image', uploadSingleFile, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { filename } = req.body;
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doctor ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const result = await updateDoctorImage(doctorId, req.file.buffer, filename);
+
+    res.json({
+      success: true,
+      message: 'Doctor image updated successfully',
+      data: {
+        doctorId: result.doctorId,
+        doctorName: result.doctorName,
+        imageUrl: result.imageUrl
+      }
+    });
+  } catch (error) {
+    console.error('Update doctor image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update doctor image'
+    });
+  }
+});
+
+// Get All Doctors with Images
+app.get('/api/doctors/with-images', async (req, res) => {
+  try {
+    const { specialty, location, available } = req.query;
+
+    const filters = {};
+    if (specialty) filters.specialty = specialty;
+    if (location) filters.location = location;
+    if (available !== undefined) filters.available = available === 'true';
+
+    const doctors = await getDoctorsWithImages(filters);
+
+    res.json({
+      success: true,
+      count: doctors.length,
+      data: doctors
+    });
+  } catch (error) {
+    console.error('Get doctors with images error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get doctors'
+    });
+  }
+});
+
 // Payment callback page (for redirect after payment)
 app.get('/payment/callback', async (req, res) => {
   try {
@@ -439,6 +729,22 @@ app.get('/', (req, res) => {
       webhooks: {
         flutterwave: '/webhook/flutterwave',
         paystack: '/webhook/paystack'
+      },
+      imageUpload: {
+        healthcare: {
+          uploadProductImage: 'POST /api/healthcare-products/upload-image',
+          getProductImage: 'GET /api/healthcare-products/:productId/image',
+          updateProductImage: 'PUT /api/healthcare-products/:productId/image'
+        },
+        prescriptions: {
+          uploadPrescription: 'POST /api/prescriptions/upload'
+        },
+        doctors: {
+          uploadDoctorImage: 'POST /api/doctors/upload-image',
+          getDoctorImage: 'GET /api/doctors/:doctorId/image',
+          updateDoctorImage: 'PUT /api/doctors/:doctorId/image',
+          getAllDoctorsWithImages: 'GET /api/doctors/with-images'
+        }
       }
     },
     timestamp: new Date().toISOString(),

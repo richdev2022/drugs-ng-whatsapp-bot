@@ -406,6 +406,275 @@ const Cart = sequelize.define('Cart', {
   tableName: 'carts'
 });
 
+// OTP Model for email verification
+const OTP = sequelize.define('OTP', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    index: true
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  purpose: {
+    type: DataTypes.ENUM('registration', 'password_reset', 'email_verification'),
+    defaultValue: 'email_verification'
+  },
+  expiresAt: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  isUsed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  usedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  }
+}, {
+  tableName: 'otps',
+  indexes: [
+    {
+      fields: ['email', 'purpose']
+    }
+  ]
+});
+
+// Diagnostic Tests Model
+const DiagnosticTest = sequelize.define('DiagnosticTest', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.TEXT
+  },
+  price: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  sampleType: {
+    type: DataTypes.STRING,
+    comment: 'e.g., Blood, Urine, Saliva'
+  },
+  collectionTime: {
+    type: DataTypes.STRING,
+    comment: 'e.g., 30 minutes, 1 hour'
+  },
+  resultTime: {
+    type: DataTypes.STRING,
+    comment: 'e.g., 24 hours, 48 hours'
+  },
+  labPartner: {
+    type: DataTypes.STRING,
+    comment: 'Name of the lab providing the test'
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'diagnostic_tests'
+});
+
+// Healthcare Products Model
+const HealthcareProduct = sequelize.define('HealthcareProduct', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'e.g., First Aid, Medical Devices, Health Supplements'
+  },
+  description: {
+    type: DataTypes.TEXT
+  },
+  price: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  stock: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  brand: {
+    type: DataTypes.STRING
+  },
+  usage: {
+    type: DataTypes.TEXT,
+    comment: 'How to use the product'
+  },
+  imageUrl: {
+    type: DataTypes.STRING
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'healthcare_products'
+});
+
+// Diagnostic Test Booking Model
+const DiagnosticBooking = sequelize.define('DiagnosticBooking', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
+  diagnosticTestId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: DiagnosticTest,
+      key: 'id'
+    }
+  },
+  sampleCollectionDate: {
+    type: DataTypes.DATE,
+    allowNull: false
+  },
+  sampleCollectionLocation: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.ENUM('Scheduled', 'Completed', 'Cancelled', 'Pending'),
+    defaultValue: 'Pending'
+  },
+  totalAmount: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  paymentStatus: {
+    type: DataTypes.ENUM('Pending', 'Paid', 'Failed'),
+    defaultValue: 'Pending'
+  },
+  paymentReference: {
+    type: DataTypes.STRING
+  },
+  notes: {
+    type: DataTypes.TEXT
+  }
+}, {
+  tableName: 'diagnostic_bookings'
+});
+
+// Support Rating Model
+const SupportRating = sequelize.define('SupportRating', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  supportChatId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  customerPhoneNumber: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  supportTeamId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'support_teams',
+      key: 'id'
+    }
+  },
+  rating: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: 1,
+      max: 5
+    }
+  },
+  feedback: {
+    type: DataTypes.TEXT
+  },
+  ratedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+}, {
+  tableName: 'support_ratings'
+});
+
+// Prescription Model for medicine orders
+const Prescription = sequelize.define('Prescription', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  orderId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Order,
+      key: 'id'
+    }
+  },
+  fileUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'URL or path to the prescription file (PDF/Image)'
+  },
+  extractedText: {
+    type: DataTypes.TEXT,
+    comment: 'OCR extracted text from prescription'
+  },
+  verificationStatus: {
+    type: DataTypes.ENUM('Pending', 'Verified', 'Rejected'),
+    defaultValue: 'Pending'
+  },
+  pharmacistNotes: {
+    type: DataTypes.TEXT
+  },
+  verifiedBy: {
+    type: DataTypes.STRING,
+    comment: 'Pharmacist name or ID'
+  },
+  verifiedAt: {
+    type: DataTypes.DATE
+  }
+}, {
+  tableName: 'prescriptions'
+});
+
 // Define relationships
 User.hasMany(Order, { foreignKey: 'userId' });
 Order.belongsTo(User, { foreignKey: 'userId' });
@@ -433,6 +702,18 @@ Cart.belongsTo(User, { foreignKey: 'userId' });
 
 Product.hasMany(Cart, { foreignKey: 'productId' });
 Cart.belongsTo(Product, { foreignKey: 'productId' });
+
+User.hasMany(DiagnosticBooking, { foreignKey: 'userId' });
+DiagnosticBooking.belongsTo(User, { foreignKey: 'userId' });
+
+DiagnosticTest.hasMany(DiagnosticBooking, { foreignKey: 'diagnosticTestId' });
+DiagnosticBooking.belongsTo(DiagnosticTest, { foreignKey: 'diagnosticTestId' });
+
+Order.hasMany(Prescription, { foreignKey: 'orderId' });
+Prescription.belongsTo(Order, { foreignKey: 'orderId' });
+
+SupportTeam.hasMany(SupportRating, { foreignKey: 'supportTeamId' });
+SupportRating.belongsTo(SupportTeam, { foreignKey: 'supportTeamId' });
 
 // Initialize database with proper error handling
 const initializeDatabase = async () => {
@@ -512,6 +793,50 @@ const seedInitialData = async () => {
         console.warn('⚠️  Could not seed doctors:', error.message);
       }
     }
+
+    // Seed diagnostic tests
+    const diagnosticTestCount = await DiagnosticTest.count();
+    if (diagnosticTestCount === 0) {
+      try {
+        const sampleDiagnosticTests = [
+          { name: "Blood Test (Full Blood Count)", category: "Blood Tests", description: "Complete blood count (CBC) test", price: 2500, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "24 hours", labPartner: "Lancet Laboratories", isActive: true },
+          { name: "COVID-19 Rapid Test", category: "Rapid Tests", description: "COVID-19 antigen rapid test", price: 1500, sampleType: "Nasal Swab", collectionTime: "5 minutes", resultTime: "15 minutes", labPartner: "Medplus Labs", isActive: true },
+          { name: "Blood Sugar Test", category: "Metabolic Tests", description: "Fasting glucose test", price: 1500, sampleType: "Blood", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Pathcare Diagnostics", isActive: true },
+          { name: "Thyroid Function Test", category: "Endocrine Tests", description: "TSH, T3, T4 levels", price: 3000, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "48 hours", labPartner: "Lancet Laboratories", isActive: true },
+          { name: "Lipid Profile", category: "Metabolic Tests", description: "Cholesterol and triglycerides test", price: 2000, sampleType: "Blood", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Medplus Labs", isActive: true },
+          { name: "Urinalysis", category: "Urinary Tests", description: "Complete urine analysis", price: 1000, sampleType: "Urine", collectionTime: "10 minutes", resultTime: "24 hours", labPartner: "Pathcare Diagnostics", isActive: true },
+          { name: "Malaria Test", category: "Infectious Disease Tests", description: "Blood smear and rapid malaria test", price: 1800, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "30 minutes", labPartner: "Medplus Labs", isActive: true },
+          { name: "Typhoid Test", category: "Infectious Disease Tests", description: "Typhoid screening test", price: 2000, sampleType: "Blood", collectionTime: "15 minutes", resultTime: "24 hours", labPartner: "Lancet Laboratories", isActive: true }
+        ];
+
+        await DiagnosticTest.bulkCreate(sampleDiagnosticTests, { ignoreDuplicates: true });
+        console.log('✓ Sample diagnostic tests seeded');
+      } catch (error) {
+        console.warn('⚠️  Could not seed diagnostic tests:', error.message);
+      }
+    }
+
+    // Seed healthcare products
+    const healthcareProductCount = await HealthcareProduct.count();
+    if (healthcareProductCount === 0) {
+      try {
+        const sampleHealthcareProducts = [
+          { name: "First Aid Kit", category: "First Aid", description: "Complete home first aid kit", price: 3500, stock: 50, brand: "SafeFirst", usage: "For minor injuries and emergency care", isActive: true },
+          { name: "Digital Thermometer", category: "Medical Devices", description: "Fast and accurate temperature reading", price: 2000, stock: 75, brand: "Braun", usage: "Place under tongue for 30 seconds", isActive: true },
+          { name: "Oximeter", category: "Medical Devices", description: "Finger pulse oximeter", price: 4500, stock: 40, brand: "Omron", usage: "Place finger in device and press button", isActive: true },
+          { name: "Glucose Meter", category: "Medical Devices", description: "Blood glucose monitoring device", price: 5000, stock: 30, brand: "Accu-Chek", usage: "Use with test strips for glucose reading", isActive: true },
+          { name: "Elastic Bandage", category: "First Aid", description: "Compression wrap for sprains", price: 800, stock: 100, brand: "3M", usage: "Wrap around affected area firmly", isActive: true },
+          { name: "Sterile Gauze Pads", category: "First Aid", description: "Pack of 10 sterile gauze pads", price: 500, stock: 150, brand: "Johnson & Johnson", usage: "For wound cleaning and dressing", isActive: true },
+          { name: "Antibiotic Cream", category: "First Aid", description: "Antibacterial ointment", price: 600, stock: 80, brand: "Neosporin", usage: "Apply to minor cuts and scrapes", isActive: true },
+          { name: "Pain Relief Gel", category: "Topical", description: "Menthol-based pain relief gel", price: 1200, stock: 60, brand: "Volini", usage: "Apply to affected area and massage", isActive: true }
+        ];
+
+        await HealthcareProduct.bulkCreate(sampleHealthcareProducts, { ignoreDuplicates: true });
+        console.log('✓ Sample healthcare products seeded');
+      } catch (error) {
+        console.warn('⚠️  Could not seed healthcare products:', error.message);
+      }
+    }
   } catch (error) {
     console.error('❌ Error seeding initial data:', error.message);
   }
@@ -529,5 +854,11 @@ module.exports = {
   SupportTeam,
   SupportChat,
   Cart,
+  OTP,
+  DiagnosticTest,
+  HealthcareProduct,
+  DiagnosticBooking,
+  SupportRating,
+  Prescription,
   initializeDatabase
 };
