@@ -99,7 +99,6 @@ if (fs.existsSync('node_modules')) {
     'axios',
     'bcryptjs',
     'crypto-js',
-    'dialogflow',
     'dotenv'
   ];
   
