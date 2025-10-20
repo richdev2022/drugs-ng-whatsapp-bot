@@ -1180,39 +1180,20 @@ const handlePayment = async (phoneNumber, session, parameters) => {
 };
 
 // Handle help
-const handleHelp = async (phoneNumber) => {
-  const helpMessage = `
-Drugs.ng WhatsApp Bot Help:
+const handleHelp = async (phoneNumber, isLoggedIn) => {
+  const helpMessage = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
 
-1. *Search for Medicines*
-   Example: "Find paracetamol"
+1️⃣ *Search Medicines* - Type "1" or "Find paracetamol"
+2️⃣ *Find Doctors* - Type "2" or "Find a cardiologist"
+3️⃣ *Track Orders* - Type "3" or "Track 12345"
+4️⃣ *Book Appointment* - Type "4" or "Book a doctor"
+5️⃣ *Place Order* - Type "5" or "Order medicines"
+6️⃣ *Customer Support* - Type "6" or "Connect me to support"
 
-2. *Search for Doctors*
-   Example: "Find a cardiologist in Lagos"
+Simply reply with a number (1-6) or describe what you need!`;
 
-3. *Order Medicines*
-   - Search for products first
-   - Add to cart: "add 1 2" (adds 2 units of product #1)
-   - Place order: "order 123 Main St, Lagos Flutterwave"
-
-4. *Track Orders*
-   Example: "track 12345"
-
-5. *Book Appointments*
-   - Search for doctors first
-   - Book: "book 1 2023-06-15 14:00"
-
-6. *Account Management*
-   - Register: "register John Doe john@example.com password"
-   - Login: "login john@example.com password"
-
-7. *Customer Support*
-   Type "support" to chat with our team
-
-Reply with the number or keyword of the service you need.
-`;
-
-  await sendWhatsAppMessage(phoneNumber, helpMessage);
+  const messageWithOptions = formatResponseWithOptions(helpMessage, isLoggedIn);
+  await sendWhatsAppMessage(phoneNumber, messageWithOptions);
 };
 
 // Handle support request
