@@ -1728,10 +1728,10 @@ const handleSupportRequest = async (phoneNumber, session, parameters) => {
 };
 
 // Handle registration OTP verification
-const handleRegistrationOTPVerification = async (phoneNumber, session) => {
+const handleRegistrationOTPVerification = async (phoneNumber, session, otpCode) => {
   try {
     const { OTP } = require('./models');
-    const otp = session.data.messageText || '';
+    const otp = otpCode || '';
     const registrationData = session.data.registrationData;
 
     if (!registrationData) {
