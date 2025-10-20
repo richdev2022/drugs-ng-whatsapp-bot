@@ -1256,13 +1256,16 @@ Simply reply with a number (1-6) or describe what you need!`;
 // Handle support request
 const handleSupportRequest = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
     const supportRole = parameters.supportType || 'general';
     const result = await startSupportChat(phoneNumber, supportRole);
-    
-    await sendWhatsAppMessage(phoneNumber, `You've been connected to our ${supportRole} support team. Please describe your issue and a support agent will assist you shortly.`);
+
+    const msg = formatResponseWithOptions(`You've been connected to our ${supportRole} support team. Please describe your issue and a support agent will assist you shortly.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msg);
   } catch (error) {
     console.error('Error starting support chat:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while connecting you to support. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while connecting you to support. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
