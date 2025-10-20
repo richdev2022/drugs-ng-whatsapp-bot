@@ -492,6 +492,137 @@ app.post('/api/prescriptions/upload', uploadSingleFile, async (req, res) => {
   }
 });
 
+// Doctor Profile Image Upload
+app.post('/api/doctors/upload-image', uploadSingleFile, async (req, res) => {
+  try {
+    const { doctorId, filename } = req.body;
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const metadata = getFileMetadata(req.file);
+
+    // Upload image to Cloudinary
+    const result = await uploadDoctorImage(req.file.buffer, doctorId, filename);
+
+    res.json({
+      success: true,
+      message: 'Doctor image uploaded successfully',
+      data: {
+        url: result.url,
+        publicId: result.publicId,
+        fileSize: metadata.size,
+        mimeType: metadata.mimeType
+      }
+    });
+  } catch (error) {
+    console.error('Doctor image upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload doctor image'
+    });
+  }
+});
+
+// Get Doctor Profile Image
+app.get('/api/doctors/:doctorId/image', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doctor ID is required'
+      });
+    }
+
+    const result = await getDoctorImageUrl(doctorId);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get doctor image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get doctor image'
+    });
+  }
+});
+
+// Update Doctor Profile Image
+app.put('/api/doctors/:doctorId/image', uploadSingleFile, async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { filename } = req.body;
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Doctor ID is required'
+      });
+    }
+
+    const validation = validateUploadedFile(req.file);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: validation.error
+      });
+    }
+
+    const result = await updateDoctorImage(doctorId, req.file.buffer, filename);
+
+    res.json({
+      success: true,
+      message: 'Doctor image updated successfully',
+      data: {
+        doctorId: result.doctorId,
+        doctorName: result.doctorName,
+        imageUrl: result.imageUrl
+      }
+    });
+  } catch (error) {
+    console.error('Update doctor image error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to update doctor image'
+    });
+  }
+});
+
+// Get All Doctors with Images
+app.get('/api/doctors/with-images', async (req, res) => {
+  try {
+    const { specialty, location, available } = req.query;
+
+    const filters = {};
+    if (specialty) filters.specialty = specialty;
+    if (location) filters.location = location;
+    if (available !== undefined) filters.available = available === 'true';
+
+    const doctors = await getDoctorsWithImages(filters);
+
+    res.json({
+      success: true,
+      count: doctors.length,
+      data: doctors
+    });
+  } catch (error) {
+    console.error('Get doctors with images error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to get doctors'
+    });
+  }
+});
+
 // Payment callback page (for redirect after payment)
 app.get('/payment/callback', async (req, res) => {
   try {
