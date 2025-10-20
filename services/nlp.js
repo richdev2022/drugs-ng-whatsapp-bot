@@ -111,6 +111,28 @@ const processMessage = async (message, phoneNumber, session) => {
       return createResponse('support', {}, 'Connecting you to our support team...');
     }
 
+    // Diagnostic tests intents
+    if (/^(diagnostic|test|blood test|lab test|screening|check up|medical test)/.test(lowerMessage) ||
+        lowerMessage === '7') {
+      return handleDiagnosticTestIntent(message);
+    }
+
+    // Healthcare products intents
+    if (/^(healthcare|health care|products|browse|equipment|devices|supplies)/.test(lowerMessage) ||
+        lowerMessage === '8') {
+      return handleHealthcareProductIntent(message);
+    }
+
+    // Password reset intents
+    if (/^(forgot|reset|change|password)/.test(lowerMessage)) {
+      return createResponse('password_reset', {}, "I'll help you reset your password. Please provide your email address.");
+    }
+
+    // Prescription upload intents
+    if (/^(upload|prescription|script|rx|medicine prescription)/.test(lowerMessage)) {
+      return createResponse('prescription_upload', {}, 'Please upload your prescription document (image or PDF) by sending it as an attachment.');
+    }
+
     // Default: Try to extract intent from keywords
     const extractedIntent = extractIntentFromMessage(lowerMessage);
     if (extractedIntent && extractedIntent.intent !== 'unknown') {
