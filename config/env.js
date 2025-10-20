@@ -107,8 +107,6 @@ const getEnv = () => ({
   // Encryption
   ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
   
-  // Dialogflow
-  DIALOGFLOW_PROJECT_ID: process.env.DIALOGFLOW_PROJECT_ID,
   
   // Flutterwave
   FLUTTERWAVE_PUBLIC_KEY: process.env.FLUTTERWAVE_PUBLIC_KEY,
