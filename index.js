@@ -7,7 +7,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const { sequelize, initializeDatabase } = require('./models');
 const { sendWhatsAppMessage, markMessageAsRead } = require('./config/whatsapp');
-const { processMessage } = require('./services/nlp');
+const { processMessage, formatResponseWithOptions } = require('./services/nlp');
 const {
   registerUser,
   loginUser,
