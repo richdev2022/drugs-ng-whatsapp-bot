@@ -896,7 +896,17 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
     }
   }
 
-  // Process with NLP
+  // Check if waiting for OTP verification during registration
+    if (session.data && session.data.waitingForOTPVerification && session.state === 'REGISTERING') {
+      const otpMatch = messageText.match(/^\d{4}$/);
+      if (otpMatch) {
+        console.log(`🔐 Processing OTP verification`);
+        await handleRegistrationOTPVerification(phoneNumber, session);
+        return;
+      }
+    }
+
+    // Process with NLP
     console.log(`🤖 Processing with NLP...`);
     const isLoggedIn = session.state === 'LOGGED_IN';
     const nlpResult = await processMessage(messageText, phoneNumber, session);
