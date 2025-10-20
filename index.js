@@ -498,10 +498,11 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
     // Process with NLP
     console.log(`🤖 Processing with NLP...`);
-    const nlpResult = await processMessage(messageText, phoneNumber);
+    const isLoggedIn = session.state === 'LOGGED_IN';
+    const nlpResult = await processMessage(messageText, phoneNumber, session);
     const { intent, parameters, fulfillmentText } = nlpResult;
     console.log(`✨ NLP Result: intent="${intent}", source="${nlpResult.source}", confidence=${nlpResult.confidence}`);
-    
+
     // Handle different intents
     console.log(`🎯 Handling intent: ${intent}`);
     switch (intent) {
@@ -519,24 +520,45 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
         await handleLogin(phoneNumber, session, parameters);
         break;
 
+      case 'logout':
+        console.log(`🔒 Handling logout`);
+        await handleLogout(phoneNumber, session);
+        break;
+
       case 'search_products':
         console.log(`🔍 Handling product search`);
-        await handleProductSearch(phoneNumber, session, parameters);
+        if (!isLoggedIn && session.state !== 'NEW') {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleProductSearch(phoneNumber, session, parameters);
+        }
         break;
 
       case 'add_to_cart':
         console.log(`🛒 Handling add to cart`);
-        await handleAddToCart(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleAddToCart(phoneNumber, session, parameters);
+        }
         break;
 
       case 'place_order':
         console.log(`📦 Handling place order`);
-        await handlePlaceOrder(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handlePlaceOrder(phoneNumber, session, parameters);
+        }
         break;
 
       case 'track_order':
         console.log(`📍 Handling track order`);
-        await handleTrackOrder(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleTrackOrder(phoneNumber, session, parameters);
+        }
         break;
 
       case 'search_doctors':
@@ -546,17 +568,25 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
       case 'book_appointment':
         console.log(`📅 Handling book appointment`);
-        await handleBookAppointment(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleBookAppointment(phoneNumber, session, parameters);
+        }
         break;
 
       case 'payment':
         console.log(`💳 Handling payment`);
-        await handlePayment(phoneNumber, session, parameters);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handlePayment(phoneNumber, session, parameters);
+        }
         break;
 
       case 'help':
         console.log(`ℹ️  Sending help message`);
-        await handleHelp(phoneNumber);
+        await handleHelp(phoneNumber, isLoggedIn);
         break;
 
       case 'support':
@@ -566,7 +596,8 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
 
       default:
         console.log(`❓ Unknown intent, sending fallback response`);
-        await sendWhatsAppMessage(phoneNumber, fulfillmentText || "I'm not sure how to help with that. Type 'help' for assistance.");
+        const responseWithOptions = formatResponseWithOptions(fulfillmentText || "I'm not sure how to help with that. Type 'help' for menu.", isLoggedIn);
+        await sendWhatsAppMessage(phoneNumber, responseWithOptions);
     }
     console.log(`✅ Successfully processed message from ${phoneNumber}\n`);
   } catch (error) {
