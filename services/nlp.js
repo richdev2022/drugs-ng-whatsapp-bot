@@ -148,6 +148,23 @@ const fallbackNLP = (message) => {
     if (/^(login|signin|sign in|log in)/.test(lowerMessage)) {
       const emailMatch = message.match(/[\w.-]+@[\w.-]+\.\w+/);
       if (emailMatch) parameters.email = emailMatch[0];
+
+      // Parse login data: "login john@example.com mypassword"
+      const afterLogin = message.replace(/^(login|signin|sign in|log in)\s+/i, '').trim();
+      const parts = afterLogin.split(/\s+/);
+
+      // Find email position
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].includes('@')) {
+          parameters.email = parts[i];
+          // Password is everything after email
+          if (i + 1 < parts.length) {
+            parameters.password = parts.slice(i + 1).join(' ');
+          }
+          break;
+        }
+      }
+
       return {
         intent: 'login',
         parameters,
