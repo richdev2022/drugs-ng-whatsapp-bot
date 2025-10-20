@@ -1094,38 +1094,44 @@ const handleTrackOrder = async (phoneNumber, session, parameters) => {
 // Handle doctor search
 const handleDoctorSearch = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!parameters.specialty) {
-      await sendWhatsAppMessage(phoneNumber, "What type of doctor are you looking for? Please provide a specialty (e.g., Cardiologist, Pediatrician).");
+      const msg = formatResponseWithOptions("What type of doctor are you looking for? Please provide a specialty (e.g., Cardiologist, Pediatrician).", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const location = parameters.location || 'Lagos';
     const doctors = await searchDoctors(parameters.specialty, location);
-    
+
     if (doctors.length === 0) {
-      await sendWhatsAppMessage(phoneNumber, `Sorry, we couldn't find any ${parameters.specialty} in ${location}. Please try a different specialty or location.`);
+      const msg = formatResponseWithOptions(`Sorry, we couldn't find any ${parameters.specialty} in ${location}. Please try a different specialty or location.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     let message = `Here are some ${parameters.specialty} doctors in ${location}:\n\n`;
-    
+
     doctors.slice(0, 5).forEach((doctor, index) => {
       message += `${index + 1}. Dr. ${doctor.name}\n`;
       message += `   Specialty: ${doctor.specialty}\n`;
       message += `   Location: ${doctor.location}\n`;
       message += `   Rating: ${doctor.rating}/5\n\n`;
     });
-    
+
     message += `To book an appointment, reply with "book [doctor number] [date] [time]"\nExample: "book 1 2023-06-15 14:00" to book the first doctor on June 15th at 2 PM.`;
-    
+
     // Save search results in session for reference
     session.data.doctorSearchResults = doctors.slice(0, 5);
     await session.save();
-    
-    await sendWhatsAppMessage(phoneNumber, message);
+
+    const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
   } catch (error) {
     console.error('Error searching doctors:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while searching for doctors. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while searching for doctors. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
