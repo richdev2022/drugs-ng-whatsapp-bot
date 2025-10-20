@@ -4,7 +4,9 @@ const FEATURE_COMMANDS = {
   '3': { intent: 'track_order', label: 'Track Orders' },
   '4': { intent: 'book_appointment', label: 'Book Appointment' },
   '5': { intent: 'place_order', label: 'Place Order' },
-  '6': { intent: 'support', label: 'Customer Support' }
+  '6': { intent: 'support', label: 'Customer Support' },
+  '7': { intent: 'diagnostic_tests', label: 'Book Diagnostic Tests' },
+  '8': { intent: 'healthcare_products', label: 'Browse Healthcare Products' }
 };
 
 const HELP_MESSAGE = `🏥 *Drugs.ng WhatsApp Bot - Available Services:*
