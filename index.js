@@ -1182,48 +1182,57 @@ const handleBookAppointment = async (phoneNumber, session, parameters) => {
 // Handle payment
 const handlePayment = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to make a payment. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to make a payment. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.orderId || !parameters.provider) {
-      await sendWhatsAppMessage(phoneNumber, "Please provide your order ID and payment provider. Example: 'pay 12345 flutterwave'");
+      const msg = formatResponseWithOptions("Please provide your order ID and payment provider. Example: 'pay 12345 flutterwave'", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     let result;
     const paymentDetails = {
-      amount: 0, // This would be fetched from the order
-      email: '', // This would be fetched from the user
+      amount: 0,
+      email: '',
       orderId: parameters.orderId
     };
-    
+
     // Get order details to populate payment info
     try {
       const orderDetails = await trackOrder(parameters.orderId);
       paymentDetails.amount = orderDetails.totalAmount;
-      
+
       // Get user email
       const user = await sequelize.models.User.findByPk(session.data.userId);
       paymentDetails.email = user.email;
     } catch (error) {
-      await sendWhatsAppMessage(phoneNumber, "Sorry, we couldn't find that order. Please check the order ID and try again.");
+      const msg = formatResponseWithOptions("Sorry, we couldn't find that order. Please check the order ID and try again.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (parameters.provider.toLowerCase() === 'flutterwave') {
       result = await processFlutterwavePayment(paymentDetails);
-      await sendWhatsAppMessage(phoneNumber, `Please complete your payment using this link: ${result.data.link}`);
+      const paymentMsg = formatResponseWithOptions(`Please complete your payment using this link: ${result.data.link}`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, paymentMsg);
     } else if (parameters.provider.toLowerCase() === 'paystack') {
       result = await processPaystackPayment(paymentDetails);
-      await sendWhatsAppMessage(phoneNumber, `Please complete your payment using this link: ${result.data.authorization_url}`);
+      const paymentMsg = formatResponseWithOptions(`Please complete your payment using this link: ${result.data.authorization_url}`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, paymentMsg);
     } else {
-      await sendWhatsAppMessage(phoneNumber, "Sorry, we only support Flutterwave and Paystack for online payments.");
+      const msg = formatResponseWithOptions("Sorry, we only support Flutterwave and Paystack for online payments.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
     }
   } catch (error) {
     console.error('Error processing payment:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while processing your payment. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while processing your payment. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
