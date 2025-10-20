@@ -152,7 +152,7 @@ app.post('/webhook', async (req, res) => {
                   await handleSupportTeamMessage(phoneNumber, messageText);
                 } else {
                   // This is a message from customer
-                  console.log(`�� Customer message from ${phoneNumber}`);
+                  console.log(`👤 Customer message from ${phoneNumber}`);
                   await handleCustomerMessage(phoneNumber, messageText);
                 }
               } catch (handleError) {
@@ -941,8 +941,11 @@ const handleAddToCart = async (phoneNumber, session, parameters) => {
 // Handle place order
 const handlePlaceOrder = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to place an order. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to place an order. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -953,7 +956,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
       message += "• Flutterwave\n";
       message += "• Paystack\n";
       message += "• Cash on Delivery\n";
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
       return;
     }
 
@@ -965,7 +969,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
     // Validate order data
     const { isValidOrderData } = require('./utils/validation');
     if (!isValidOrderData(orderData)) {
-      await sendWhatsAppMessage(phoneNumber, "❌ Invalid delivery address or payment method. Please try again.");
+      const msg = formatResponseWithOptions("❌ Invalid delivery address or payment method. Please try again.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -978,7 +983,8 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
       amount: result.totalAmount || 'TBD'
     });
 
-    await sendWhatsAppMessage(phoneNumber, `✅ Your order has been placed successfully!\n\nOrder ID: #${result.orderId}`);
+    const successMsg = formatResponseWithOptions(`✅ Your order has been placed successfully!\n\nOrder ID: #${result.orderId}`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
 
     // Generate payment link if online payment is selected
     const validPaymentMethods = ['Flutterwave', 'Paystack'];
