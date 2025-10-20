@@ -757,7 +757,8 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
 
         const validation = isValidRegistrationData(userData);
         if (!validation.valid) {
-          await sendWhatsAppMessage(phoneNumber, `Registration failed: ${validation.error}`);
+          const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+          await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
 
@@ -765,7 +766,7 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
         const result = await registerUser(userData);
 
         // Update session
-        session.state = 'REGISTERED';
+        session.state = 'LOGGED_IN';
         session.data.userId = result.userId;
         session.data.token = result.token;
         await session.save();
@@ -776,11 +777,13 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
           email: userData.email
         });
 
-        await sendWhatsAppMessage(phoneNumber, `✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`);
+        const successMsg = formatResponseWithOptions(`✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`, true);
+        await sendWhatsAppMessage(phoneNumber, successMsg);
       } catch (error) {
         console.error('Registration error:', error);
         const errorMessage = handleApiError(error, 'registration').message;
-        await sendWhatsAppMessage(phoneNumber, `❌ Registration failed: ${errorMessage}`);
+        const errorMsg = formatResponseWithOptions(`❌ Registration failed: ${errorMessage}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
       }
     } else {
       // Request missing parameters
@@ -791,10 +794,12 @@ const handleRegistration = async (phoneNumber, session, parameters) => {
       if (!parameters.email) message += "• Email address (valid email format)\n";
       if (!parameters.password) message += "• Password (at least 6 characters)\n";
 
-      await sendWhatsAppMessage(phoneNumber, message);
+      const msgWithOptions = formatResponseWithOptions(message, false);
+      await sendWhatsAppMessage(phoneNumber, msgWithOptions);
     }
   } else {
-    await sendWhatsAppMessage(phoneNumber, "You're already registered. Type 'help' to see available services.");
+    const msg = formatResponseWithOptions("You're already registered. Type 'help' to see available services.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
