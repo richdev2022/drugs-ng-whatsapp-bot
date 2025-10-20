@@ -152,7 +152,7 @@ app.post('/webhook', async (req, res) => {
                   await handleSupportTeamMessage(phoneNumber, messageText);
                 } else {
                   // This is a message from customer
-                  console.log(`👤 Customer message from ${phoneNumber}`);
+                  console.log(`�� Customer message from ${phoneNumber}`);
                   await handleCustomerMessage(phoneNumber, messageText);
                 }
               } catch (handleError) {
@@ -903,31 +903,38 @@ const handleProductSearch = async (phoneNumber, session, parameters) => {
 // Handle add to cart
 const handleAddToCart = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to add items to your cart. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to add items to your cart. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.productIndex || !parameters.quantity) {
-      await sendWhatsAppMessage(phoneNumber, "Please specify which product and quantity to add. Example: 'add 1 2' to add 2 units of the first product from your search results.");
+      const msg = formatResponseWithOptions("Please specify which product and quantity to add. Example: 'add 1 2' to add 2 units of the first product from your search results.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const productIndex = parseInt(parameters.productIndex) - 1;
     const quantity = parseInt(parameters.quantity);
-    
+
     if (!session.data.searchResults || !session.data.searchResults[productIndex]) {
-      await sendWhatsAppMessage(phoneNumber, "Please search for products first before adding to cart.");
+      const msg = formatResponseWithOptions("Please search for products first before adding to cart.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const product = session.data.searchResults[productIndex];
     const result = await addToCart(session.data.userId, product.id, quantity);
-    
-    await sendWhatsAppMessage(phoneNumber, `Added ${quantity} units of ${product.name} to your cart. Type 'cart' to view your cart or 'checkout' to place your order.`);
+
+    const successMsg = formatResponseWithOptions(`Added ${quantity} units of ${product.name} to your cart. Type 'cart' to view your cart or 'checkout' to place your order.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
   } catch (error) {
     console.error('Error adding to cart:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while adding to your cart. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while adding to your cart. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
