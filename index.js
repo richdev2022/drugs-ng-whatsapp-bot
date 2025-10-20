@@ -498,61 +498,79 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
     console.log(`✨ NLP Result: intent="${intent}", source="${nlpResult.source}", confidence=${nlpResult.confidence}`);
     
     // Handle different intents
+    console.log(`🎯 Handling intent: ${intent}`);
     switch (intent) {
       case 'greeting':
         await handleGreeting(phoneNumber, session);
         break;
-        
+
       case 'register':
+        console.log(`📝 Handling registration`);
         await handleRegistration(phoneNumber, session, parameters);
         break;
-        
+
       case 'login':
+        console.log(`🔐 Handling login`);
         await handleLogin(phoneNumber, session, parameters);
         break;
-        
+
       case 'search_products':
+        console.log(`🔍 Handling product search`);
         await handleProductSearch(phoneNumber, session, parameters);
         break;
-        
+
       case 'add_to_cart':
+        console.log(`🛒 Handling add to cart`);
         await handleAddToCart(phoneNumber, session, parameters);
         break;
-        
+
       case 'place_order':
+        console.log(`📦 Handling place order`);
         await handlePlaceOrder(phoneNumber, session, parameters);
         break;
-        
+
       case 'track_order':
+        console.log(`📍 Handling track order`);
         await handleTrackOrder(phoneNumber, session, parameters);
         break;
-        
+
       case 'search_doctors':
+        console.log(`👨‍⚕️ Handling doctor search`);
         await handleDoctorSearch(phoneNumber, session, parameters);
         break;
-        
+
       case 'book_appointment':
+        console.log(`📅 Handling book appointment`);
         await handleBookAppointment(phoneNumber, session, parameters);
         break;
-        
+
       case 'payment':
+        console.log(`💳 Handling payment`);
         await handlePayment(phoneNumber, session, parameters);
         break;
-        
+
       case 'help':
+        console.log(`ℹ️  Sending help message`);
         await handleHelp(phoneNumber);
         break;
-        
+
       case 'support':
+        console.log(`🆘 Handling support request`);
         await handleSupportRequest(phoneNumber, session, parameters);
         break;
-        
+
       default:
+        console.log(`❓ Unknown intent, sending fallback response`);
         await sendWhatsAppMessage(phoneNumber, fulfillmentText || "I'm not sure how to help with that. Type 'help' for assistance.");
     }
+    console.log(`✅ Successfully processed message from ${phoneNumber}\n`);
   } catch (error) {
-    console.error('Error processing customer message:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, something went wrong. Please try again later.");
+    console.error(`❌ Error processing customer message from ${phoneNumber}:`, error.message);
+    try {
+      await sendWhatsAppMessage(phoneNumber, "Sorry, something went wrong. Please try again later.");
+    } catch (sendError) {
+      console.error(`❌ Failed to send error message to ${phoneNumber}:`, sendError.message);
+    }
   }
 };
 
