@@ -378,6 +378,44 @@ const handlePaymentIntent = (message) => {
   return createResponse('payment', parameters);
 };
 
+const handleDiagnosticTestIntent = (message) => {
+  const parameters = {};
+  const lowerMessage = message.toLowerCase();
+
+  const testKeywords = [
+    'blood test', 'covid test', 'malaria test', 'typhoid test', 'thyroid test',
+    'glucose test', 'lipid profile', 'urinalysis', 'full blood count'
+  ];
+
+  for (const test of testKeywords) {
+    if (lowerMessage.includes(test)) {
+      parameters.testType = test;
+      break;
+    }
+  }
+
+  return createResponse('diagnostic_tests', parameters);
+};
+
+const handleHealthcareProductIntent = (message) => {
+  const parameters = {};
+  const lowerMessage = message.toLowerCase();
+
+  const categories = [
+    'first aid', 'medical devices', 'thermometer', 'oximeter', 'glucose meter',
+    'bandage', 'gauze', 'cream', 'gel', 'kit'
+  ];
+
+  for (const category of categories) {
+    if (lowerMessage.includes(category)) {
+      parameters.category = category;
+      break;
+    }
+  }
+
+  return createResponse('healthcare_products', parameters);
+};
+
 const extractIntentFromMessage = (lowerMessage) => {
   const keywords = [
     {
