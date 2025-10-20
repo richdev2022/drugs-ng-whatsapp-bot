@@ -896,7 +896,17 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
     }
   }
 
-  // Process with NLP
+  // Check if waiting for OTP verification during registration
+    if (session.data && session.data.waitingForOTPVerification && session.state === 'REGISTERING') {
+      const otpMatch = messageText.match(/^\d{4}$/);
+      if (otpMatch) {
+        console.log(`🔐 Processing OTP verification`);
+        await handleRegistrationOTPVerification(phoneNumber, session, otpMatch[0]);
+        return;
+      }
+    }
+
+    // Process with NLP
     console.log(`🤖 Processing with NLP...`);
     const isLoggedIn = session.state === 'LOGGED_IN';
     const nlpResult = await processMessage(messageText, phoneNumber, session);
@@ -992,6 +1002,24 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
       case 'support':
         console.log(`🆘 Handling support request`);
         await handleSupportRequest(phoneNumber, session, parameters);
+        break;
+
+      case 'diagnostic_tests':
+        console.log(`🔬 Handling diagnostic tests search`);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleDiagnosticTestSearch(phoneNumber, session, parameters);
+        }
+        break;
+
+      case 'healthcare_products':
+        console.log(`🛒 Handling healthcare products browse`);
+        if (!isLoggedIn) {
+          await sendAuthRequiredMessage(phoneNumber);
+        } else {
+          await handleHealthcareProductBrowse(phoneNumber, session, parameters);
+        }
         break;
 
       default:
@@ -1116,7 +1144,7 @@ const handleLogout = async (phoneNumber, session) => {
     session.data = {};
     await session.save();
 
-    const logoutMessage = "👋 You have been logged out successfully.\n\nType 'help' to get started again or 'login' to sign back in.";
+    const logoutMessage = "�� You have been logged out successfully.\n\nType 'help' to get started again or 'login' to sign back in.";
     await sendWhatsAppMessage(phoneNumber, logoutMessage);
   } catch (error) {
     console.error('Error during logout:', error);
@@ -1141,49 +1169,78 @@ const handleGreeting = async (phoneNumber, session) => {
 // Handle registration
 const handleRegistration = async (phoneNumber, session, parameters) => {
   if (session.state === 'NEW' || session.state === 'REGISTERING') {
-    session.state = 'REGISTERING';
-    await session.save();
-
-    // If we have all required parameters
+    // If we have all required parameters (name, email, password)
     if (parameters.name && parameters.email && parameters.password) {
-      try {
-        // Validate input
-        const userData = {
-          name: sanitizeInput(parameters.name),
-          email: sanitizeInput(parameters.email).toLowerCase(),
-          password: sanitizeInput(parameters.password),
-          phoneNumber: normalizePhoneNumber(phoneNumber)
-        };
+      const userData = {
+        name: sanitizeInput(parameters.name),
+        email: sanitizeInput(parameters.email).toLowerCase(),
+        password: sanitizeInput(parameters.password),
+        phoneNumber: normalizePhoneNumber(phoneNumber)
+      };
 
-        const validation = isValidRegistrationData(userData);
-        if (!validation.valid) {
-          const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+      // Validate input
+      const validation = isValidRegistrationData(userData);
+      if (!validation.valid) {
+        const errorMsg = formatResponseWithOptions(`Registration failed: ${validation.error}`, false);
+        await sendWhatsAppMessage(phoneNumber, errorMsg);
+        return;
+      }
+
+      // Check if email already exists
+      try {
+        const existingUser = await sequelize.models.User.findOne({
+          where: { email: userData.email }
+        });
+
+        if (existingUser) {
+          const errorMsg = formatResponseWithOptions(`❌ This email is already registered. Type 'login' to sign in or use a different email.`, false);
           await sendWhatsAppMessage(phoneNumber, errorMsg);
           return;
         }
+      } catch (error) {
+        console.error('Error checking existing user:', error);
+      }
 
-        // Register user in both PostgreSQL and Drugs.ng API
-        const result = await registerUser(userData);
+      // Store registration data in session
+      session.state = 'REGISTERING';
+      session.data.registrationData = userData;
+      await session.save();
 
-        // Update session
-        session.state = 'LOGGED_IN';
-        session.data.userId = result.userId;
-        session.data.token = result.token;
-        await session.save();
+      // Request OTP to be sent to email
+      try {
+        const { generateOTP, getOTPExpiry } = require('./utils/otp');
+        const { OTP } = require('./models');
 
-        // Notify support teams
-        await notifySupportTeams(phoneNumber, 'New User Registration', {
-          name: userData.name,
-          email: userData.email
+        // Generate and save OTP
+        const otp = generateOTP();
+        const expiresAt = getOTPExpiry();
+
+        await OTP.create({
+          email: userData.email,
+          code: otp,
+          purpose: 'registration',
+          expiresAt: expiresAt
         });
 
-        const successMsg = formatResponseWithOptions(`✅ Registration successful! Welcome to Drugs.ng, ${userData.name}. You can now access all our services. Type 'help' to get started!`, true);
-        await sendWhatsAppMessage(phoneNumber, successMsg);
+        // Send OTP email
+        const { sendOTPEmail } = require('./config/brevo');
+        await sendOTPEmail(userData.email, otp, userData.name);
+
+        const otpMsg = formatResponseWithOptions(`📧 OTP has been sent to ${userData.email}. Please reply with your 4-digit code to complete registration. The code is valid for 5 minutes.`, false);
+        await sendWhatsAppMessage(phoneNumber, otpMsg);
+
+        // Store that we're waiting for OTP verification
+        session.data.waitingForOTPVerification = true;
+        session.data.registrationAttempts = (session.data.registrationAttempts || 0) + 1;
+        await session.save();
+
       } catch (error) {
-        console.error('Registration error:', error);
-        const errorMessage = handleApiError(error, 'registration').message;
-        const errorMsg = formatResponseWithOptions(`❌ Registration failed: ${errorMessage}`, false);
+        console.error('Error sending OTP:', error);
+        const errorMsg = formatResponseWithOptions(`❌ Failed to send OTP. Please try again.`, false);
         await sendWhatsAppMessage(phoneNumber, errorMsg);
+        session.data.registrationData = null;
+        session.data.waitingForOTPVerification = false;
+        await session.save();
       }
     } else {
       // Request missing parameters
@@ -1244,7 +1301,7 @@ const handleLogin = async (phoneNumber, session, parameters) => {
       }
     } else {
       // Request missing parameters
-      let message = "🔐 To login, send your credentials in one message:\n";
+      let message = "���� To login, send your credentials in one message:\n";
       message += "Example: 'login john@example.com mypassword'\n\n";
       if (!parameters.email) message += "• Email address\n";
       if (!parameters.password) message += "• Password\n";
@@ -1666,6 +1723,205 @@ const handleSupportRequest = async (phoneNumber, session, parameters) => {
   } catch (error) {
     console.error('Error starting support chat:', error);
     const msg = formatResponseWithOptions("Sorry, we encountered an error while connecting you to support. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
+  }
+};
+
+// Handle registration OTP verification
+const handleRegistrationOTPVerification = async (phoneNumber, session, otpCode) => {
+  try {
+    const { OTP } = require('./models');
+    const otp = otpCode || '';
+    const registrationData = session.data.registrationData;
+
+    if (!registrationData) {
+      const msg = formatResponseWithOptions("Registration session expired. Please start again by typing 'register'.", false);
+      await sendWhatsAppMessage(phoneNumber, msg);
+      session.data.waitingForOTPVerification = false;
+      await session.save();
+      return;
+    }
+
+    // Verify OTP
+    const otpRecord = await OTP.findOne({
+      where: {
+        email: registrationData.email,
+        code: otp,
+        purpose: 'registration',
+        isUsed: false
+      }
+    });
+
+    if (!otpRecord) {
+      const msg = formatResponseWithOptions("❌ Invalid OTP. Please try again or type 'help' for assistance.", false);
+      await sendWhatsAppMessage(phoneNumber, msg);
+      return;
+    }
+
+    // Check if OTP is expired
+    if (new Date() > otpRecord.expiresAt) {
+      const msg = formatResponseWithOptions("❌ OTP has expired. Type 'register' to start over and receive a new OTP.", false);
+      await sendWhatsAppMessage(phoneNumber, msg);
+      session.data.waitingForOTPVerification = false;
+      session.data.registrationData = null;
+      await session.save();
+      return;
+    }
+
+    // Mark OTP as used
+    otpRecord.isUsed = true;
+    otpRecord.usedAt = new Date();
+    await otpRecord.save();
+
+    // Complete registration
+    try {
+      const result = await registerUser(registrationData);
+
+      // Update session
+      session.state = 'LOGGED_IN';
+      session.data.userId = result.userId;
+      session.data.token = result.token;
+      session.data.waitingForOTPVerification = false;
+      session.data.registrationData = null;
+      await session.save();
+
+      // Notify support teams
+      await notifySupportTeams(phoneNumber, 'New User Registration', {
+        name: registrationData.name,
+        email: registrationData.email
+      });
+
+      const successMsg = formatResponseWithOptions(`✅ Registration successful! Welcome to Drugs.ng, ${registrationData.name}. You can now access all our services. Type 'help' to get started!`, true);
+      await sendWhatsAppMessage(phoneNumber, successMsg);
+    } catch (error) {
+      console.error('Registration completion error:', error);
+      const errorMessage = handleApiError(error, 'registration').message;
+      const errorMsg = formatResponseWithOptions(`❌ Registration failed: ${errorMessage}. Please try again.`, false);
+      await sendWhatsAppMessage(phoneNumber, errorMsg);
+      session.data.waitingForOTPVerification = false;
+      session.data.registrationData = null;
+      await session.save();
+    }
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    const msg = formatResponseWithOptions("❌ Error verifying OTP. Please try again.", false);
+    await sendWhatsAppMessage(phoneNumber, msg);
+    session.data.waitingForOTPVerification = false;
+    await session.save();
+  }
+};
+
+// Handle diagnostic test search
+const handleDiagnosticTestSearch = async (phoneNumber, session, parameters) => {
+  try {
+    const { DiagnosticTest } = require('./models');
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
+    let tests;
+    if (parameters.testType) {
+      // Search for specific test type
+      tests = await DiagnosticTest.findAll({
+        where: {
+          [sequelize.Op.or]: [
+            { name: { [sequelize.Op.iLike]: `%${parameters.testType}%` } },
+            { category: { [sequelize.Op.iLike]: `%${parameters.testType}%` } }
+          ],
+          isActive: true
+        },
+        limit: 10
+      });
+    } else {
+      // Get all available tests
+      tests = await DiagnosticTest.findAll({
+        where: { isActive: true },
+        limit: 10
+      });
+    }
+
+    if (tests.length === 0) {
+      const msg = formatResponseWithOptions(`❌ No diagnostic tests found${parameters.testType ? ` for "${parameters.testType}"` : ''}. Please try a different search or type 'help' for more options.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
+      return;
+    }
+
+    // Store search results in session
+    session.data.diagnosticTestResults = tests;
+    await session.save();
+
+    // Format response
+    let response = `🔬 *Available Diagnostic Tests:*\n\n`;
+    tests.forEach((test, index) => {
+      response += `${index + 1}. *${test.name}* - ₦${test.price}\n`;
+      response += `   Category: ${test.category}\n`;
+      response += `   Sample: ${test.sampleType || 'N/A'} | Time: ${test.resultTime || 'N/A'}\n`;
+      if (test.description) response += `   ${test.description}\n`;
+      response += `\n`;
+    });
+
+    response += `Reply with the test number to book (e.g., "1" for the first test).`;
+    const msgWithOptions = formatResponseWithOptions(response, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
+  } catch (error) {
+    console.error('Error searching diagnostic tests:', error);
+    const msg = formatResponseWithOptions("❌ Error retrieving diagnostic tests. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
+  }
+};
+
+// Handle healthcare product browse
+const handleHealthcareProductBrowse = async (phoneNumber, session, parameters) => {
+  try {
+    const { HealthcareProduct } = require('./models');
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
+    let products;
+    if (parameters.category) {
+      // Search for specific category
+      products = await HealthcareProduct.findAll({
+        where: {
+          [sequelize.Op.or]: [
+            { name: { [sequelize.Op.iLike]: `%${parameters.category}%` } },
+            { category: { [sequelize.Op.iLike]: `%${parameters.category}%` } }
+          ],
+          isActive: true
+        },
+        limit: 10
+      });
+    } else {
+      // Get all available products
+      products = await HealthcareProduct.findAll({
+        where: { isActive: true },
+        limit: 10
+      });
+    }
+
+    if (products.length === 0) {
+      const msg = formatResponseWithOptions(`❌ No healthcare products found${parameters.category ? ` in "${parameters.category}"` : ''}. Please try a different search or type 'help' for more options.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
+      return;
+    }
+
+    // Store search results in session
+    session.data.healthcareProductResults = products;
+    await session.save();
+
+    // Format response
+    let response = `🛒 *Available Healthcare Products:*\n\n`;
+    products.forEach((product, index) => {
+      response += `${index + 1}. *${product.name}* - ₦${product.price}\n`;
+      response += `   Category: ${product.category}${product.brand ? ` | Brand: ${product.brand}` : ''}\n`;
+      response += `   Stock: ${product.stock > 0 ? product.stock + ' units' : 'Out of stock'}\n`;
+      if (product.description) response += `   ${product.description}\n`;
+      if (product.usage) response += `   Usage: ${product.usage}\n`;
+      response += `\n`;
+    });
+
+    response += `Reply with the product number to add to cart (e.g., "1" for the first product).`;
+    const msgWithOptions = formatResponseWithOptions(response, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
+  } catch (error) {
+    console.error('Error browsing healthcare products:', error);
+    const msg = formatResponseWithOptions("❌ Error retrieving healthcare products. Please try again later.", session.state === 'LOGGED_IN');
     await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
