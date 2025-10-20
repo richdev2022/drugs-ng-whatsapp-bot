@@ -702,6 +702,28 @@ const handleSupportCommand = async (supportTeam, commandText) => {
   }
 };
 
+// Send authentication required message
+const sendAuthRequiredMessage = async (phoneNumber) => {
+  const authMessage = `🔐 *Authentication Required*\n\nYou need to be logged in to access this feature.\n\nPlease login with your email and password:\nExample: login john@example.com mypassword\n\nOr register if you're new:\nExample: register John Doe john@example.com mypassword\n\n📋 Type "help" to see all options.`;
+  await sendWhatsAppMessage(phoneNumber, authMessage);
+};
+
+// Handle logout
+const handleLogout = async (phoneNumber, session) => {
+  console.log(`🔒 Handling logout for ${phoneNumber}`);
+  try {
+    session.state = 'NEW';
+    session.data = {};
+    await session.save();
+
+    const logoutMessage = "👋 You have been logged out successfully.\n\nType 'help' to get started again or 'login' to sign back in.";
+    await sendWhatsAppMessage(phoneNumber, logoutMessage);
+  } catch (error) {
+    console.error('Error during logout:', error);
+    await sendWhatsAppMessage(phoneNumber, "Sorry, there was an error logging you out. Please try again.");
+  }
+};
+
 // Handle greeting
 const handleGreeting = async (phoneNumber, session) => {
   console.log(`👋 Handling greeting for ${phoneNumber}, session state: ${session.state}`);
