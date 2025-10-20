@@ -592,6 +592,12 @@ app.get('/', (req, res) => {
       webhooks: {
         flutterwave: '/webhook/flutterwave',
         paystack: '/webhook/paystack'
+      },
+      imageUpload: {
+        uploadProductImage: 'POST /api/healthcare-products/upload-image',
+        getProductImage: 'GET /api/healthcare-products/:productId/image',
+        updateProductImage: 'PUT /api/healthcare-products/:productId/image',
+        uploadPrescription: 'POST /api/prescriptions/upload'
       }
     },
     timestamp: new Date().toISOString(),
