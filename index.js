@@ -112,7 +112,7 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
   try {
     const data = req.body;
-    
+
     // Check if this is a WhatsApp message
     if (data.object === 'whatsapp_business_account') {
       // Process each entry
@@ -120,32 +120,50 @@ app.post('/webhook', async (req, res) => {
         for (const change of entry.changes) {
           if (change.field === 'messages') {
             const message = change.value.messages[0];
-            
+
             if (message.type === 'text') {
               const phoneNumber = message.from;
               const messageText = message.text.body;
               const messageId = message.id;
-              
+
+              console.log(`📨 Received message from ${phoneNumber}: "${messageText}"`);
+
               // Mark message as read
-              await markMessageAsRead(messageId);
-              
+              try {
+                await markMessageAsRead(messageId);
+              } catch (readError) {
+                console.warn('Failed to mark message as read:', readError.message);
+              }
+
               // Check if this is a support team message
               const supportTeam = await sequelize.models.SupportTeam.findOne({
                 where: { phoneNumber }
               });
-              
-              if (supportTeam) {
-                // This is a message from support team
-                await handleSupportTeamMessage(phoneNumber, messageText);
-              } else {
-                // This is a message from customer
-                await handleCustomerMessage(phoneNumber, messageText);
+
+              try {
+                if (supportTeam) {
+                  // This is a message from support team
+                  console.log(`👨‍💼 Support team message from ${phoneNumber}`);
+                  await handleSupportTeamMessage(phoneNumber, messageText);
+                } else {
+                  // This is a message from customer
+                  console.log(`👤 Customer message from ${phoneNumber}`);
+                  await handleCustomerMessage(phoneNumber, messageText);
+                }
+              } catch (handleError) {
+                console.error(`❌ Error handling message from ${phoneNumber}:`, handleError.message);
+                // Try to send error message to user
+                try {
+                  await sendWhatsAppMessage(phoneNumber, 'Sorry, I encountered an error processing your message. Please try again.');
+                } catch (errorReplyError) {
+                  console.error('Failed to send error reply:', errorReplyError.message);
+                }
               }
             }
           }
         }
       }
-      
+
       res.sendStatus(200);
     } else {
       res.sendStatus(404);
