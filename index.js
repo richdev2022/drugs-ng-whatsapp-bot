@@ -1039,8 +1039,11 @@ const handlePlaceOrder = async (phoneNumber, session, parameters) => {
 // Handle track order
 const handleTrackOrder = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!parameters.orderId) {
-      await sendWhatsAppMessage(phoneNumber, "📍 To track your order, provide the order ID.\n\nExample: 'track 12345'");
+      const msg = formatResponseWithOptions("📍 To track your order, provide the order ID.\n\nExample: 'track 12345'", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -1048,7 +1051,8 @@ const handleTrackOrder = async (phoneNumber, session, parameters) => {
     const orderDetails = await trackOrder(orderId);
 
     if (!orderDetails) {
-      await sendWhatsAppMessage(phoneNumber, `❌ Order #${orderId} not found. Please verify the order ID.`);
+      const msg = formatResponseWithOptions(`❌ Order #${orderId} not found. Please verify the order ID.`, isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
 
@@ -1077,11 +1081,13 @@ const handleTrackOrder = async (phoneNumber, session, parameters) => {
     message += `\n*Delivery Address:*\n${orderDetails.shippingAddress || 'Not provided'}\n\n`;
     message += `Need help? Type 'support' to chat with our team.`;
 
-    await sendWhatsAppMessage(phoneNumber, message);
+    const msgWithOptions = formatResponseWithOptions(message, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, msgWithOptions);
   } catch (error) {
     console.error('Error tracking order:', error);
     const errorMessage = handleApiError(error, 'track_order').message;
-    await sendWhatsAppMessage(phoneNumber, `❌ ${errorMessage}`);
+    const msg = formatResponseWithOptions(`❌ ${errorMessage}`, session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
