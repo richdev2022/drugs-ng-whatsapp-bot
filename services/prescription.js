@@ -2,6 +2,7 @@ const Tesseract = require('tesseract.js');
 const { Prescription, Order } = require('../models');
 const fs = require('fs');
 const path = require('path');
+const { uploadImage } = require('./cloudinary');
 
 // Initialize Tesseract worker
 let worker = null;
@@ -136,6 +137,41 @@ const savePrescription = async (orderId, fileUrl, extractedText = null, parsedDa
     };
   } catch (error) {
     console.error('Error saving prescription:', error);
+    throw error;
+  }
+};
+
+// Upload prescription file to Cloudinary and save to database
+const uploadAndSavePrescription = async (orderId, fileBuffer, filename = null) => {
+  try {
+    if (!orderId || !fileBuffer) {
+      throw new Error('Order ID and file buffer are required');
+    }
+
+    // Verify order exists
+    const order = await Order.findByPk(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    // Upload to Cloudinary
+    const uploadedFile = await uploadImage(fileBuffer, {
+      folder: 'drugs-ng/prescriptions',
+      filename: filename || `prescription-order-${orderId}-${Date.now()}`
+    });
+
+    // Save prescription record with Cloudinary URL
+    const prescription = await savePrescription(orderId, uploadedFile.url);
+
+    return {
+      success: true,
+      message: 'Prescription uploaded and saved successfully',
+      prescriptionId: prescription.prescriptionId,
+      fileUrl: uploadedFile.url,
+      verificationStatus: prescription.verificationStatus
+    };
+  } catch (error) {
+    console.error('Error uploading and saving prescription:', error);
     throw error;
   }
 };

@@ -20,6 +20,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "flutterwave-node-v3": "^1.0.8",
+    "multer": "^2.0.2",
     "paystack": "^2.0.1",
     "pg": "^8.11.0",
     "pg-hstore": "^2.3.4",
