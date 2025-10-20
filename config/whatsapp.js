@@ -79,8 +79,45 @@ const markMessageAsRead = async (messageId) => {
   }
 };
 
+// Get media info by ID
+const getMediaInfo = async (mediaId) => {
+  try {
+    const response = await whatsappAPI.get(`/${mediaId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching media info:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Download media content by URL (requires auth header)
+const downloadMediaByUrl = async (url) => {
+  try {
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+    });
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || null
+    };
+  } catch (error) {
+    console.error('Error downloading media by URL:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Download media by ID
+const downloadMedia = async (mediaId) => {
+  const info = await getMediaInfo(mediaId);
+  const { buffer, contentType } = await downloadMediaByUrl(info.url);
+  return { buffer, mimeType: contentType, info };
+};
+
 module.exports = {
   sendWhatsAppMessage,
   sendInteractiveMessage,
-  markMessageAsRead
+  markMessageAsRead,
+  getMediaInfo,
+  downloadMedia
 };

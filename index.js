@@ -6,7 +6,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const { sequelize, initializeDatabase } = require('./models');
-const { sendWhatsAppMessage, markMessageAsRead } = require('./config/whatsapp');
+const { sendWhatsAppMessage, markMessageAsRead, getMediaInfo, downloadMedia } = require('./config/whatsapp');
 const { processMessage, formatResponseWithOptions } = require('./services/nlp');
 const {
   registerUser,
@@ -37,7 +37,7 @@ const {
   updateProductImage,
   getProductImageUrl
 } = require('./services/healthcareProducts');
-const { uploadAndSavePrescription } = require('./services/prescription');
+const { uploadAndSavePrescription, savePrescription } = require('./services/prescription');
 const {
   uploadDoctorImage,
   updateDoctorImage,
@@ -45,6 +45,7 @@ const {
   getDoctorsWithImages
 } = require('./services/doctorImages');
 
+const { uploadImage } = require('./services/cloudinary');
 const app = express();
 const PORT = ENV.PORT || 3000;
 
@@ -176,6 +177,79 @@ app.post('/webhook', async (req, res) => {
                 } catch (errorReplyError) {
                   console.error('Failed to send error reply:', errorReplyError.message);
                 }
+              }
+            } else if (message.type === 'image' || message.type === 'document') {
+              const phoneNumber = message.from;
+              const messageId = message.id;
+
+              // Mark message as read
+              try {
+                await markMessageAsRead(messageId);
+              } catch (readError) {
+                console.warn('Failed to mark message as read:', readError.message);
+              }
+
+              try {
+                let mediaId = null;
+                let mimeType = null;
+                let filename = null;
+                let caption = '';
+
+                if (message.type === 'image') {
+                  mediaId = message.image.id;
+                  mimeType = message.image.mime_type || 'image/jpeg';
+                  caption = message.image.caption || '';
+                  filename = `prescription-${Date.now()}`;
+                } else {
+                  mediaId = message.document.id;
+                  mimeType = message.document.mime_type || 'application/pdf';
+                  filename = message.document.filename || `prescription-${Date.now()}.pdf`;
+                  caption = message.document.caption || message.caption || '';
+                }
+
+                // Validate allowed types
+                const allowed = ['image/jpeg','image/png','image/webp','image/gif','application/pdf'];
+                if (!allowed.includes(mimeType)) {
+                  await sendWhatsAppMessage(phoneNumber, 'Unsupported file type. Please send an image (JPG, PNG, WEBP, GIF) or a PDF.');
+                } else {
+                  // Download media from WhatsApp
+                  const { buffer } = await downloadMedia(mediaId);
+
+                  // Upload to Cloudinary immediately to avoid storing large files in session
+                  const uploadResult = await uploadImage(buffer, {
+                    folder: 'drugs-ng/prescriptions',
+                    filename,
+                    resourceType: 'auto'
+                  });
+
+                  // Try to get order ID from caption like: "rx 123", "order 123", "prescription 123"
+                  const match = caption && caption.match(/(?:rx|order|prescription)\s*#?(\d+)/i);
+
+                  if (match && match[1]) {
+                    const orderId = match[1];
+                    try {
+                      const result = await savePrescription(orderId, uploadResult.url);
+                      await sendWhatsAppMessage(phoneNumber, `✅ Prescription received and attached to order #${orderId}. Status: ${result.verificationStatus || 'Pending'}.`);
+                    } catch (err) {
+                      console.error('Attach prescription error:', err);
+                      await sendWhatsAppMessage(phoneNumber, `Prescription uploaded but could not attach to order #${orderId}: ${err.message}. You can link it later by replying: rx ${orderId}`);
+                    }
+                  } else {
+                    // Save URL in session as pending and ask user for order ID
+                    let session = await sequelize.models.Session.findOne({ where: { phoneNumber } });
+                    if (!session) {
+                      session = await sequelize.models.Session.create({ phoneNumber, state: 'NEW', data: {} });
+                    }
+                    session.data = session.data || {};
+                    session.data.pendingPrescriptionUrl = uploadResult.url;
+                    await session.save();
+
+                    await sendWhatsAppMessage(phoneNumber, '📄 Prescription received.\n\nTo attach it to an order, reply now with your Order ID.\nExample: rx 12345\n\nNext time, you can auto-attach by adding a caption to your file: \n• rx 12345\n• order 12345\n• prescription 12345\n\nWhere to find your Order ID:\n• In your order confirmation message (look for "Order ID: #12345")\n• If you know it, check status with: track 12345\n• If you can’t find it, type "support" and we’ll help link it for you.');
+                  }
+                }
+              } catch (err) {
+                console.error('Media handling error:', err);
+                await sendWhatsAppMessage(phoneNumber, 'Sorry, there was a problem processing your file. Please try again or send a different file.');
               }
             }
           }
@@ -795,14 +869,34 @@ const handleCustomerMessage = async (phoneNumber, messageText) => {
     await session.save();
 
     // Check if in support chat
-    if (session.state === 'SUPPORT_CHAT') {
-      console.log(`💬 ${phoneNumber} is in support chat, forwarding message`);
-      // Forward message to support team
-      await sendSupportMessage(phoneNumber, messageText, true);
+  if (session.state === 'SUPPORT_CHAT') {
+    console.log(`💬 ${phoneNumber} is in support chat, forwarding message`);
+    // Forward message to support team
+    await sendSupportMessage(phoneNumber, messageText, true);
+    return;
+  }
+
+  // Quick attach command for prescriptions: "rx 12345" or "attach 12345" or "link 12345"
+  const attachMatch = messageText.trim().match(/^(?:rx|attach|link)\s+#?(\d+)/i);
+  if (attachMatch) {
+    const orderId = attachMatch[1];
+    if (session.data && session.data.pendingPrescriptionUrl) {
+      try {
+        const result = await savePrescription(orderId, session.data.pendingPrescriptionUrl);
+        session.data.pendingPrescriptionUrl = null;
+        await session.save();
+        await sendWhatsAppMessage(phoneNumber, `✅ Prescription attached to order #${orderId}. Status: ${result.verificationStatus || 'Pending'}.`);
+      } catch (err) {
+        await sendWhatsAppMessage(phoneNumber, `❌ Could not attach to order #${orderId}: ${err.message}`);
+      }
+      return;
+    } else {
+      await sendWhatsAppMessage(phoneNumber, 'No prescription file is pending.\n\nPlease send an image or PDF of your prescription first. Supported types: JPG, PNG, WEBP, GIF, PDF.\n\nTip: Add a caption with your Order ID to auto-attach, e.g. rx 12345 (also accepts "order 12345" or "prescription 12345"). If you don’t know your Order ID, check your order confirmation message or type "support" for help.');
       return;
     }
+  }
 
-    // Process with NLP
+  // Process with NLP
     console.log(`🤖 Processing with NLP...`);
     const isLoggedIn = session.state === 'LOGGED_IN';
     const nlpResult = await processMessage(messageText, phoneNumber, session);
@@ -1552,8 +1646,9 @@ const handleHelp = async (phoneNumber, isLoggedIn) => {
 4️⃣ *Book Appointment* - Type "4" or "Book a doctor"
 5️⃣ *Place Order* - Type "5" or "Order medicines"
 6️⃣ *Customer Support* - Type "6" or "Connect me to support"
+7️⃣ *Upload Prescription* (image or PDF) - Send your file. To auto-attach, add a caption with your Order ID, e.g.: rx 12345 (also accepts "order 12345" or "prescription 12345"). Find your Order ID in your order confirmation message (e.g., "Order ID: #12345"). If unsure, type "support" and we’ll help link it.
 
-Simply reply with a number (1-6) or describe what you need!`;
+Simply reply with a number (1-7) or describe what you need!`;
 
   const messageWithOptions = formatResponseWithOptions(helpMessage, isLoggedIn);
   await sendWhatsAppMessage(phoneNumber, messageWithOptions);
