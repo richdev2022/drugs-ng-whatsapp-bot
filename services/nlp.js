@@ -160,6 +160,10 @@ const createResponse = (intent, parameters = {}, fulfillmentText = null, source 
     book_appointment: 'I can help you book an appointment. Please provide the doctor and your preferred date and time.',
     payment: 'I can help you make a payment. Please provide your order ID and preferred payment method.',
     support: 'Connecting you to our support team. Please describe your issue.',
+    diagnostic_tests: 'What diagnostic test would you like to book? (e.g., blood test, malaria test, thyroid test)',
+    healthcare_products: 'What healthcare product would you like to browse? (e.g., first aid kit, thermometer, oximeter)',
+    password_reset: "I'll help you reset your password. Please provide your email address.",
+    prescription_upload: 'Please upload your prescription document (image or PDF) by sending it as an attachment.',
     logout: 'You have been logged out. Type "help" to get started again.',
     unknown: "I'm not sure how to help with that. Type 'help' to see available options.",
     error: 'I encountered an error. Please try again.'
