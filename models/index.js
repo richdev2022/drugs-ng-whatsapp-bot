@@ -33,8 +33,7 @@ const User = sequelize.define('User', {
   },
   phoneNumber: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   drugsngUserId: {
     type: DataTypes.STRING,
