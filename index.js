@@ -1138,37 +1138,44 @@ const handleDoctorSearch = async (phoneNumber, session, parameters) => {
 // Handle book appointment
 const handleBookAppointment = async (phoneNumber, session, parameters) => {
   try {
+    const isLoggedIn = session.state === 'LOGGED_IN';
+
     if (!session.data.userId) {
-      await sendWhatsAppMessage(phoneNumber, "Please login first to book an appointment. Type 'login' to proceed.");
+      const msg = formatResponseWithOptions("Please login first to book an appointment. Type 'login' to proceed.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     if (!parameters.doctorIndex || !parameters.date || !parameters.time) {
-      await sendWhatsAppMessage(phoneNumber, "Please specify which doctor, date, and time for your appointment. Example: 'book 1 2023-06-15 14:00' to book the first doctor on June 15th at 2 PM.");
+      const msg = formatResponseWithOptions("Please specify which doctor, date, and time for your appointment. Example: 'book 1 2023-06-15 14:00' to book the first doctor on June 15th at 2 PM.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const doctorIndex = parseInt(parameters.doctorIndex) - 1;
     const dateTime = new Date(`${parameters.date}T${parameters.time}`);
-    
+
     if (!session.data.doctorSearchResults || !session.data.doctorSearchResults[doctorIndex]) {
-      await sendWhatsAppMessage(phoneNumber, "Please search for doctors first before booking an appointment.");
+      const msg = formatResponseWithOptions("Please search for doctors first before booking an appointment.", isLoggedIn);
+      await sendWhatsAppMessage(phoneNumber, msg);
       return;
     }
-    
+
     const doctor = session.data.doctorSearchResults[doctorIndex];
     const result = await bookAppointment(session.data.userId, doctor.id, dateTime);
-    
+
     // Notify support team
     await notifySupportTeam(phoneNumber, 'medical', 'New Appointment Booked', {
       doctorName: doctor.name,
       dateTime: dateTime.toISOString()
     });
-    
-    await sendWhatsAppMessage(phoneNumber, `Your appointment with Dr. ${doctor.name} has been scheduled for ${dateTime.toLocaleString()}. Appointment ID: ${result.appointmentId}. You will receive a confirmation shortly.`);
+
+    const successMsg = formatResponseWithOptions(`Your appointment with Dr. ${doctor.name} has been scheduled for ${dateTime.toLocaleString()}. Appointment ID: ${result.appointmentId}. You will receive a confirmation shortly.`, isLoggedIn);
+    await sendWhatsAppMessage(phoneNumber, successMsg);
   } catch (error) {
     console.error('Error booking appointment:', error);
-    await sendWhatsAppMessage(phoneNumber, "Sorry, we encountered an error while booking your appointment. Please try again later.");
+    const msg = formatResponseWithOptions("Sorry, we encountered an error while booking your appointment. Please try again later.", session.state === 'LOGGED_IN');
+    await sendWhatsAppMessage(phoneNumber, msg);
   }
 };
 
