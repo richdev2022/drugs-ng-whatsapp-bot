@@ -31,6 +31,13 @@ const {
   endSupportChat,
   getUnreadSupportMessages
 } = require('./services/support');
+const { uploadSingleFile, validateUploadedFile, getFileMetadata } = require('./utils/uploadHandler');
+const {
+  uploadProductImage,
+  updateProductImage,
+  getProductImageUrl
+} = require('./services/healthcareProducts');
+const { uploadAndSavePrescription } = require('./services/prescription');
 
 const app = express();
 const PORT = ENV.PORT || 3000;
