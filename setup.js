@@ -36,7 +36,6 @@ if (fs.existsSync('.env')) {
     (process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD);
   
   const optionalVars = [
-    'DIALOGFLOW_PROJECT_ID',
     'FLUTTERWAVE_PUBLIC_KEY',
     'FLUTTERWAVE_SECRET_KEY',
     'FLUTTERWAVE_SECRET_HASH',
