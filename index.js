@@ -731,10 +731,20 @@ app.get('/', (req, res) => {
         paystack: '/webhook/paystack'
       },
       imageUpload: {
-        uploadProductImage: 'POST /api/healthcare-products/upload-image',
-        getProductImage: 'GET /api/healthcare-products/:productId/image',
-        updateProductImage: 'PUT /api/healthcare-products/:productId/image',
-        uploadPrescription: 'POST /api/prescriptions/upload'
+        healthcare: {
+          uploadProductImage: 'POST /api/healthcare-products/upload-image',
+          getProductImage: 'GET /api/healthcare-products/:productId/image',
+          updateProductImage: 'PUT /api/healthcare-products/:productId/image'
+        },
+        prescriptions: {
+          uploadPrescription: 'POST /api/prescriptions/upload'
+        },
+        doctors: {
+          uploadDoctorImage: 'POST /api/doctors/upload-image',
+          getDoctorImage: 'GET /api/doctors/:doctorId/image',
+          updateDoctorImage: 'PUT /api/doctors/:doctorId/image',
+          getAllDoctorsWithImages: 'GET /api/doctors/with-images'
+        }
       }
     },
     timestamp: new Date().toISOString(),
